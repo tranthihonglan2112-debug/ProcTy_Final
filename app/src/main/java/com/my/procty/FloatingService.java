@@ -50,7 +50,7 @@ public class FloatingService extends Service {
     private static boolean crashHandlerInstalled = false;
 
     private WindowManager windowManager;
-    private View roiView; // Khung xanh debug
+    private View roiView;
     private DisplayManager displayManager;
     private MediaProjection mediaProjection;
     private volatile VirtualDisplay virtualDisplay;
@@ -221,7 +221,7 @@ public class FloatingService extends Service {
             displayManager.registerDisplayListener(displayListener, captureHandler);
             Log.i(TAG_FRAME, "Capture sẵn sàng: " + captureWidth + "x" + captureHeight + " @" + captureDpi + "dpi");
 
-            // VẼ KHUNG DEBUG ROI (150x150)
+            // VẼ KHUNG DEBUG ROI (Tự động căn giữa)
             drawRoiBox(captureWidth, captureHeight);
             
         } catch (Exception e) {
@@ -233,21 +233,24 @@ public class FloatingService extends Service {
         try {
             roiView = new View(this);
             GradientDrawable border = new GradientDrawable();
-            border.setColor(0x00000000); // Trong suốt
-            border.setStroke(3, 0xFF00D2FF); // Viền xanh dày 3px
+            border.setColor(0x2200D2FF); // Màu xanh mờ nhẹ
+            border.setStroke(5, 0xFF00D2FF); // Viền xanh dày 5px
             roiView.setBackground(border);
 
             int layoutParamType = (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) ?
                     WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY : WindowManager.LayoutParams.TYPE_PHONE;
 
+            int boxSize = 300;
             WindowManager.LayoutParams params = new WindowManager.LayoutParams(
-                    300, 300,
+                    boxSize, boxSize,
                     layoutParamType, WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
                     PixelFormat.TRANSLUCENT
             );
             params.gravity = Gravity.TOP | Gravity.LEFT;
-            params.x = 795 - 150; 
-        params.y = 360 - 150;
+            
+            // TỰ ĐỘNG CĂN GIỮA MÀN HÌNH
+            params.x = (screenW / 2) - (boxSize / 2); 
+            params.y = (screenH / 2) - (boxSize / 2);
 
             windowManager.addView(roiView, params);
             Log.i(TAG_FRAME, "Đã vẽ khung ROI tại X=" + params.x + ", Y=" + params.y);
@@ -266,6 +269,10 @@ public class FloatingService extends Service {
             int imgH = image.getHeight();
             boolean portrait = imgW < imgH;
 
+            // GIẢM FPS XUỐNG ~20FPS (Bỏ qua 2/3 số frame)
+            frameCount++;
+            if (frameCount % 3 != 0) return;
+
             isScanning = prefs.getBoolean("is_scanning", false);
             int mode = prefs.getInt("mode", 1);
             int cR = prefs.getInt("color_r", 200);
@@ -281,7 +288,7 @@ public class FloatingService extends Service {
             ByteBuffer buffer = planes[0].getBuffer();
             int rowStride = planes[0].getRowStride();
 
-            // ĐỌC ẢNH MẪU TỪ DOWNLOADS (Nếu đang ở Mode 2)
+            // ĐỌC ẢNH MẪU
             byte[] templateData = null; 
             int tplW = 0, tplH = 0;
 
@@ -293,14 +300,9 @@ public class FloatingService extends Service {
                         templateData = new byte[(int) tplFile.length()];
                         int bytesRead = is.read(templateData);
                         is.close();
-                        if (bytesRead > 0) {
-                            Log.d(TAG_FRAME, "Đã đọc ảnh mẫu: " + bytesRead + " bytes");
-                        }
                     } catch (Exception e) {
                         Log.e(TAG_ERROR, "Lỗi đọc ảnh: " + e.getMessage());
                     }
-                } else {
-                    Log.e(TAG_ERROR, "Không tìm thấy ảnh mẫu tại: " + tplFile.getAbsolutePath());
                 }
             }
 

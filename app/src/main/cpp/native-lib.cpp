@@ -11,20 +11,18 @@ Java_com_my_procty_FloatingService_nativeFindTarget(JNIEnv *env, jobject thiz, j
     
     if (pixels == nullptr || capacity <= 0) return 0;
 
-    // TÂM NGẮM THỰC TẾ (Khớp với khung xanh bên Java)
-    int centerX = 795;
-    int centerY = 360;
+    // TỰ ĐỘNG LẤY TÂM MÀN HÌNH (Khớp với khung xanh bên Java)
+    int centerX = width / 2;
+    int centerY = height / 2;
 
     // ================== MODE 1: LỌC MÀU ==================
     if (mode == 1) { 
-        // SỬA: Vùng quét (ROI) tăng lên 300x300 cho khớp với khung xanh
         int boxSize = 300; 
         int startX = centerX - (boxSize / 2);
         int startY = centerY - (boxSize / 2);
         int endX = centerX + (boxSize / 2);
         int endY = centerY + (boxSize / 2);
 
-        // Đảm bảo không vượt biên màn hình
         if (startX < 0) startX = 0;
         if (startY < 0) startY = 0;
         if (endX > width) endX = width;
@@ -42,7 +40,6 @@ Java_com_my_procty_FloatingService_nativeFindTarget(JNIEnv *env, jobject thiz, j
                 uint8_t g = pixels[offset + 1];
                 uint8_t b = pixels[offset + 2];
 
-                // Lọc theo màu người dùng chọn (sai số 30 đơn vị)
                 if (std::abs(r - cR) < 30 && std::abs(g - cG) < 30 && std::abs(b - cB) < 30) {
                     count++; sumX += x; sumY += y;
                 }
@@ -61,6 +58,10 @@ Java_com_my_procty_FloatingService_nativeFindTarget(JNIEnv *env, jobject thiz, j
     else if (mode == 2 && templateData != nullptr) {
         cv::Mat screenMat(height, width, CV_8UC4, pixels, rowStride);
         
+        // CHUYỂN SANG 3 KÊNH MÀU (RGB) ĐỂ KHỚP VỚI ẢNH MẪU
+        cv::Mat screenMatRGB;
+        cv::cvtColor(screenMat, screenMatRGB, cv::COLOR_RGBA2RGB);
+        
         jbyte *tplBytes = env->GetByteArrayElements(templateData, nullptr);
         std::vector<uchar> vecData(tplBytes, tplBytes + env->GetArrayLength(templateData));
         env->ReleaseByteArrayElements(templateData, tplBytes, JNI_ABORT);
@@ -68,7 +69,8 @@ Java_com_my_procty_FloatingService_nativeFindTarget(JNIEnv *env, jobject thiz, j
         cv::Mat tplMatOriginal = cv::imdecode(vecData, cv::IMREAD_COLOR);
         if (tplMatOriginal.empty()) return 0;
 
-        double scales[] = {0.7, 1.0, 1.3};
+        
+        double scales[] = {1.0,0,5}; 
         double bestMatchVal = 0.0;
         cv::Point bestMatchLoc;
 
@@ -83,7 +85,8 @@ Java_com_my_procty_FloatingService_nativeFindTarget(JNIEnv *env, jobject thiz, j
             if (tplMat.cols >= width || tplMat.rows >= height) continue;
 
             cv::Mat resultMat;
-            cv::matchTemplate(screenMat, tplMat, resultMat, cv::TM_CCOEFF_NORMED);
+            // SO KHỚP TRÊN ẢNH RGB
+            cv::matchTemplate(screenMatRGB, tplMat, resultMat, cv::TM_CCOEFF_NORMED);
 
             double minVal, maxVal;
             cv::Point minLoc, maxLoc;
