@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="#55FFFFFF">
+    <item>
+        <shape android:shape="rectangle">
+            <corners android:radius="12dp" />
+            <!-- Gradient Xanh tím chuyển màu -->
+            <gradient
+                android:angle="0"
+                android:endColor="#5A189A"
+                android:startColor="#3A0CA3"
+                android:type="linear" />
+            <stroke android:width="2dp" android:color="#00D2FF" /> <!-- Viền neon xanh -->
+        </shape>
+    </item>
+</ripple>

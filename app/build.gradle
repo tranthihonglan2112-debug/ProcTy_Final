@@ -1,0 +1,72 @@
+plugins {
+    alias(libs.plugins.android.application)
+}
+
+android {
+    namespace 'com.my.procty'
+    compileSdk 37
+    ndkVersion "27.3.13750724" // Thay bằng số version NDK mà PC bạn đã cài (xem trong SDK Manager)
+
+    defaultConfig {
+        applicationId 'com.my.procty'
+        minSdk 29 // Giữ nguyên 29 như đã sửa để tránh lỗi TLS trên NDK mới
+        targetSdk 34
+        versionCode 3
+        versionName '1.2 - By Phúc 💥'
+
+        testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
+
+        // Khai báo ABI để build ra file .so cho điện thoại
+        ndk {
+            abiFilters "arm64-v8a", "armeabi-v7a"
+        }
+
+        externalNativeBuild {
+            cmake {
+                cppFlags ""
+                arguments "-DANDROID_STL=c++_shared" // <-- DÒNG MỚI THÊM VÀO ĐÂY
+            }
+        }
+    }
+
+    // Trỏ đến file CMakeLists.txt
+    externalNativeBuild {
+        cmake {
+            path "src/main/cpp/CMakeLists.txt"
+            // KHÔNG cần ghi version ở đây, Android Studio sẽ tự dùng bản CMake chuẩn của nó
+        }
+    }
+
+    signingConfigs {
+        debug {
+            storeFile file('debug.keystore')
+            storePassword 'android'
+            keyAlias 'androiddebugkey'
+            keyPassword 'android'
+        }
+    }
+
+    buildTypes {
+        debug {
+            signingConfig signingConfigs.debug
+        }
+    }
+
+    buildFeatures {
+        viewBinding true
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation libs.androidx.core
+    implementation libs.androidx.appcompat
+    implementation libs.material
+    implementation libs.androidx.constraintlayout
+    implementation 'dev.rikka.shizuku:api:13.1.5'
+    implementation 'dev.rikka.shizuku:provider:13.1.5'
+}
