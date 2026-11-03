@@ -11,16 +11,20 @@ Java_com_my_procty_FloatingService_nativeFindTarget(JNIEnv *env, jobject thiz, j
     
     if (pixels == nullptr || capacity <= 0) return 0;
 
-    int centerX = width / 2;
-    int centerY = height / 2;
+    // TÂM NGẮM THỰC TẾ (Khớp với khung xanh bên Java)
+    int centerX = 795;
+    int centerY = 360;
 
     // ================== MODE 1: LỌC MÀU ==================
     if (mode == 1) { 
-        int startX = centerX - 150;
-        int startY = centerY - 150;
-        int endX = centerX + 150;
-        int endY = centerY + 150;
+        // SỬA: Vùng quét (ROI) tăng lên 300x300 cho khớp với khung xanh
+        int boxSize = 300; 
+        int startX = centerX - (boxSize / 2);
+        int startY = centerY - (boxSize / 2);
+        int endX = centerX + (boxSize / 2);
+        int endY = centerY + (boxSize / 2);
 
+        // Đảm bảo không vượt biên màn hình
         if (startX < 0) startX = 0;
         if (startY < 0) startY = 0;
         if (endX > width) endX = width;
@@ -53,12 +57,10 @@ Java_com_my_procty_FloatingService_nativeFindTarget(JNIEnv *env, jobject thiz, j
             return ((jlong) uX << 32) | uY;
         }
     } 
-    // ================== MODE 2: SO KHỚP ẢNH MẪU (ĐA TỶ LỆ) ==================
+    // ================== MODE 2: SO KHỚP ẢNH MẪU ==================
     else if (mode == 2 && templateData != nullptr) {
-        // 1. Chuyển màn hình game thành ma trận OpenCV
         cv::Mat screenMat(height, width, CV_8UC4, pixels, rowStride);
         
-        // 2. Giải mã mảng byte ảnh mẫu thành cv::Mat
         jbyte *tplBytes = env->GetByteArrayElements(templateData, nullptr);
         std::vector<uchar> vecData(tplBytes, tplBytes + env->GetArrayLength(templateData));
         env->ReleaseByteArrayElements(templateData, tplBytes, JNI_ABORT);
@@ -66,7 +68,6 @@ Java_com_my_procty_FloatingService_nativeFindTarget(JNIEnv *env, jobject thiz, j
         cv::Mat tplMatOriginal = cv::imdecode(vecData, cv::IMREAD_COLOR);
         if (tplMatOriginal.empty()) return 0;
 
-        // 3. TẠO 3 TỶ LỆ THU PHÓNG (70%, 100%, 130%)
         double scales[] = {0.7, 1.0, 1.3};
         double bestMatchVal = 0.0;
         cv::Point bestMatchLoc;
@@ -74,15 +75,13 @@ Java_com_my_procty_FloatingService_nativeFindTarget(JNIEnv *env, jobject thiz, j
         for (double scale : scales) {
             cv::Mat tplMat;
             if (scale == 1.0) {
-                tplMat = tplMatOriginal; // Giữ nguyên kích thước gốc
+                tplMat = tplMatOriginal;
             } else {
                 cv::resize(tplMatOriginal, tplMat, cv::Size(), scale, scale, cv::INTER_LINEAR);
             }
 
-            // Nếu ảnh mẫu sau khi thu phóng to hơn màn hình game thì bỏ qua
             if (tplMat.cols >= width || tplMat.rows >= height) continue;
 
-            // Chạy so khớp
             cv::Mat resultMat;
             cv::matchTemplate(screenMat, tplMat, resultMat, cv::TM_CCOEFF_NORMED);
 
@@ -90,15 +89,12 @@ Java_com_my_procty_FloatingService_nativeFindTarget(JNIEnv *env, jobject thiz, j
             cv::Point minLoc, maxLoc;
             cv::minMaxLoc(resultMat, &minVal, &maxVal, &minLoc, &maxLoc);
 
-            // Cập nhật kết quả tốt nhất
             if (maxVal > bestMatchVal) {
                 bestMatchVal = maxVal;
-                // Tính tâm của vật thể khớp
                 bestMatchLoc = cv::Point(maxLoc.x + (tplMat.cols / 2), maxLoc.y + (tplMat.rows / 2));
             }
         }
 
-        // 4. KIỂM TRA NGƯỠNG (0.5 = 50%)
         if (bestMatchVal >= 0.5) {
             int matchX = bestMatchLoc.x;
             int matchY = bestMatchLoc.y;

@@ -241,14 +241,13 @@ public class FloatingService extends Service {
                     WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY : WindowManager.LayoutParams.TYPE_PHONE;
 
             WindowManager.LayoutParams params = new WindowManager.LayoutParams(
-                    150, 150, // Kích thước 150x150 khớp với C++
+                    300, 300,
                     layoutParamType, WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
                     PixelFormat.TRANSLUCENT
             );
             params.gravity = Gravity.TOP | Gravity.LEFT;
-            // Căn giữa màn hình
-            params.x = (screenW / 2) - 75; 
-            params.y = (screenH / 2) - 75;
+            params.x = 795 - 150; 
+        params.y = 360 - 150;
 
             windowManager.addView(roiView, params);
             Log.i(TAG_FRAME, "Đã vẽ khung ROI tại X=" + params.x + ", Y=" + params.y);
