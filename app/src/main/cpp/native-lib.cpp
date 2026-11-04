@@ -11,7 +11,7 @@ Java_com_my_procty_FloatingService_nativeFindTarget(JNIEnv *env, jobject thiz, j
     
     if (pixels == nullptr || capacity <= 0) return 0;
 
-    // TỰ ĐỘNG LẤY TÂM MÀN HÌNH (Khớp với khung xanh bên Java)
+    // TỰ ĐỘNG LẤY TÂM MÀN HÌNH
     int centerX = width / 2;
     int centerY = height / 2;
 
@@ -58,7 +58,7 @@ Java_com_my_procty_FloatingService_nativeFindTarget(JNIEnv *env, jobject thiz, j
     else if (mode == 2 && templateData != nullptr) {
         cv::Mat screenMat(height, width, CV_8UC4, pixels, rowStride);
         
-        // CHUYỂN SANG 3 KÊNH MÀU (RGB) ĐỂ KHỚP VỚI ẢNH MẪU
+        // CHUYỂN ẢNH MÀN HÌNH SANG 3 KÊNH MÀU (RGB)
         cv::Mat screenMatRGB;
         cv::cvtColor(screenMat, screenMatRGB, cv::COLOR_RGBA2RGB);
         
@@ -69,8 +69,15 @@ Java_com_my_procty_FloatingService_nativeFindTarget(JNIEnv *env, jobject thiz, j
         cv::Mat tplMatOriginal = cv::imdecode(vecData, cv::IMREAD_COLOR);
         if (tplMatOriginal.empty()) return 0;
 
-        
-        double scales[] = {1.0,0,5}; 
+        // BẢO HIỂM: Đảm bảo ảnh mẫu luôn là 3 kênh màu (RGB) giống ảnh màn hình
+        if (tplMatOriginal.channels() == 4) {
+            cv::cvtColor(tplMatOriginal, tplMatOriginal, cv::COLOR_RGBA2RGB);
+        } else if (tplMatOriginal.channels() == 1) {
+            cv::cvtColor(tplMatOriginal, tplMatOriginal, cv::COLOR_GRAY2RGB);
+        }
+
+        // MẢNG THU PHÓNG (ĐÃ SỬA LỖI DẤU PHẨY)
+        double scales[] = {1.0, 0.5}; 
         double bestMatchVal = 0.0;
         cv::Point bestMatchLoc;
 

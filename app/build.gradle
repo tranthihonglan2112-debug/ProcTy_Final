@@ -5,18 +5,17 @@ plugins {
 android {
     namespace 'com.my.procty'
     compileSdk 37
-    ndkVersion "27.3.13750724" // Thay bằng số version NDK mà PC bạn đã cài (xem trong SDK Manager)
+    ndkVersion "27.3.13750724"
 
     defaultConfig {
         applicationId 'com.my.procty'
-        minSdk 29 // Giữ nguyên 29 như đã sửa để tránh lỗi TLS trên NDK mới
+        minSdk 29
         targetSdk 34
         versionCode 3
         versionName '1.2 - By Phúc 💥'
 
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
 
-        // Khai báo ABI để build ra file .so cho điện thoại
         ndk {
             abiFilters "arm64-v8a", "armeabi-v7a"
         }
@@ -24,17 +23,20 @@ android {
         externalNativeBuild {
             cmake {
                 cppFlags ""
-                arguments "-DANDROID_STL=c++_shared" // <-- DÒNG MỚI THÊM VÀO ĐÂY
+                arguments "-DANDROID_STL=c++_shared"
             }
         }
     }
 
-    // Trỏ đến file CMakeLists.txt
     externalNativeBuild {
         cmake {
             path "src/main/cpp/CMakeLists.txt"
-            // KHÔNG cần ghi version ở đây, Android Studio sẽ tự dùng bản CMake chuẩn của nó
         }
+    }
+
+    // CỰC KỲ QUAN TRỌNG: Không nén file minitouch để nó có thể thực thi
+    androidResources {
+        noCompress 'minitouch'
     }
 
     signingConfigs {

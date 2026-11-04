@@ -45,7 +45,9 @@ public class FloatingService extends Service {
     private static final String TAG_ERROR = "ProcTyError";
 
     private static final boolean REQUIRE_LANDSCAPE = true;
-    private static final long MIN_SWIPE_INTERVAL_MS = 150;
+    
+    // Giảm khoảng nghỉ vì Minitouch phản hồi nhanh
+    private static final long MIN_SWIPE_INTERVAL_MS = 50; 
 
     private static boolean crashHandlerInstalled = false;
 
@@ -90,7 +92,8 @@ public class FloatingService extends Service {
 
             startForegroundWithAppropriateType();
 
-            InputInjector.init();
+            // KHỞI TẠO MINITOUCH THAY VÌ INPUTINJECTOR
+            MinitouchController.init(this);
 
         } catch (Exception e) {
             Log.e(TAG_ERROR, "Lỗi onCreate: " + e, e);
@@ -248,8 +251,8 @@ public class FloatingService extends Service {
             );
             params.gravity = Gravity.TOP | Gravity.LEFT;
             
-            // TỰ ĐỘNG CĂN GIỮA MÀN HÌNH
-            params.x = (screenW / 2) - (boxSize / 2); 
+            // SỬA LỆCH SANG TRÁI 30 PIXEL (Trừ đi 30)
+            params.x = (screenW / 2) - (boxSize / 2) - 30; 
             params.y = (screenH / 2) - (boxSize / 2);
 
             windowManager.addView(roiView, params);
@@ -312,7 +315,8 @@ public class FloatingService extends Service {
                 int deltaX = (int) (result >> 32) - 2000;
                 int deltaY = (int) (result & 0xFFFFFFFFL) - 2000;
                 
-                int targetX = (imgW / 2) + deltaX;
+                // Căn tâm màn hình và bù trừ độ lệch khung xanh
+                int targetX = ((imgW / 2) - 30) + deltaX;
                 int targetY = (imgH / 2) + deltaY;
 
                 Log.d("ProcTyTarget", "Kéo tâm tới: X=" + targetX + ", Y=" + targetY);
@@ -320,7 +324,8 @@ public class FloatingService extends Service {
                 long now = SystemClock.uptimeMillis();
                 if (now - lastSwipeUptime >= MIN_SWIPE_INTERVAL_MS) {
                     lastSwipeUptime = now;
-                    InputInjector.swipe(imgW / 2, imgH / 2, targetX, targetY, 10);
+                    // GỌI MINITOUCH THAY VÌ INPUTINJECTOR
+                    MinitouchController.swipe(imgW / 2, imgH / 2, targetX, targetY, 10);
                 }
             }
         } catch (Exception e) {
@@ -432,5 +437,7 @@ public class FloatingService extends Service {
             captureThread = null;
             captureHandler = null;
         }
+        
+        MinitouchController.close();
     }
 }
