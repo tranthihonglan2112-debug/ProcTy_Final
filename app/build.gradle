@@ -4,7 +4,7 @@ plugins {
 
 android {
     namespace 'com.my.procty'
-    compileSdk 37
+    compileSdk 36 // Hạ xuống 36 vì AGP 8.13 chưa hỗ trợ 37
     ndkVersion "27.3.13750724"
 
     defaultConfig {
@@ -34,9 +34,11 @@ android {
         }
     }
 
-    // CỰC KỲ QUAN TRỌNG: Không nén file minitouch để nó có thể thực thi
-    androidResources {
-        noCompress 'minitouch'
+    // ĐOẠN CODE QUAN TRỌNG ĐỂ SỬA LỖI TRÙNG LẶP FILE .SO
+    packaging {
+        jniLibs {
+            pickFirsts += ['**/libc++_shared.so']
+        }
     }
 
     signingConfigs {
