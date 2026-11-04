@@ -1,0 +1,17 @@
+R_DEF: Internal format may change without notice
+local
+drawable bg_floating_button
+drawable ic_launcher_background
+drawable ic_launcher_foreground
+id btnCheckShizuku
+id btnStartProcTy
+id btnToggle
+layout activity_main
+layout floating_view
+mipmap ic_launcher
+mipmap ic_launcher_round
+string app_name
+style AppTheme
+style Base.AppTheme
+xml backup_rules
+xml data_extraction_rules

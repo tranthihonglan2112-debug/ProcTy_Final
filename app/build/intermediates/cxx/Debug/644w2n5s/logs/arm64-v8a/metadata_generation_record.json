@@ -1,0 +1,119 @@
+[
+  {
+    "level_": 0,
+    "message_": "Start JSON generation. Platform version: 24 min SDK version: arm64-v8a",
+    "file_": "/storage/emulated/0/AndroidIDEProjects/ProcTy/app/src/main/cpp/CMakeLists.txt",
+    "tag_": "debug|arm64-v8a",
+    "diagnosticCode_": 0,
+    "memoizedIsInitialized": 1,
+    "unknownFields": {
+      "fields": {}
+    },
+    "memoizedSize": -1,
+    "memoizedHashCode": 0
+  },
+  {
+    "level_": 0,
+    "message_": "rebuilding JSON /storage/emulated/0/AndroidIDEProjects/ProcTy/app/.cxx/Debug/644w2n5s/arm64-v8a/android_gradle_build.json due to:",
+    "file_": "/storage/emulated/0/AndroidIDEProjects/ProcTy/app/src/main/cpp/CMakeLists.txt",
+    "tag_": "debug|arm64-v8a",
+    "diagnosticCode_": 0,
+    "memoizedIsInitialized": 1,
+    "unknownFields": {
+      "fields": {}
+    },
+    "memoizedSize": -1,
+    "memoizedHashCode": 0
+  },
+  {
+    "level_": 0,
+    "message_": "- no fingerprint file, will remove stale configuration folder",
+    "file_": "/storage/emulated/0/AndroidIDEProjects/ProcTy/app/src/main/cpp/CMakeLists.txt",
+    "tag_": "debug|arm64-v8a",
+    "diagnosticCode_": 0,
+    "memoizedIsInitialized": 1,
+    "unknownFields": {
+      "fields": {}
+    },
+    "memoizedSize": -1,
+    "memoizedHashCode": 0
+  },
+  {
+    "level_": 0,
+    "message_": "removing stale contents from \u0027/storage/emulated/0/AndroidIDEProjects/ProcTy/app/.cxx/Debug/644w2n5s/arm64-v8a\u0027",
+    "file_": "/storage/emulated/0/AndroidIDEProjects/ProcTy/app/src/main/cpp/CMakeLists.txt",
+    "tag_": "debug|arm64-v8a",
+    "diagnosticCode_": 0,
+    "memoizedIsInitialized": 1,
+    "unknownFields": {
+      "fields": {}
+    },
+    "memoizedSize": -1,
+    "memoizedHashCode": 0
+  },
+  {
+    "level_": 0,
+    "message_": "created folder \u0027/storage/emulated/0/AndroidIDEProjects/ProcTy/app/.cxx/Debug/644w2n5s/arm64-v8a\u0027",
+    "file_": "/storage/emulated/0/AndroidIDEProjects/ProcTy/app/src/main/cpp/CMakeLists.txt",
+    "tag_": "debug|arm64-v8a",
+    "diagnosticCode_": 0,
+    "memoizedIsInitialized": 1,
+    "unknownFields": {
+      "fields": {}
+    },
+    "memoizedSize": -1,
+    "memoizedHashCode": 0
+  },
+  {
+    "level_": 0,
+    "message_": "executing cmake /data/user/0/com.tom.rv2ide/files/home/android-sdk/cmake/4.1.2/bin/cmake \\\n  -H/storage/emulated/0/AndroidIDEProjects/ProcTy/app/src/main/cpp \\\n  -DCMAKE_SYSTEM_NAME\u003dAndroid \\\n  -DCMAKE_EXPORT_COMPILE_COMMANDS\u003dON \\\n  -DCMAKE_SYSTEM_VERSION\u003d24 \\\n  -DANDROID_PLATFORM\u003dandroid-24 \\\n  -DANDROID_ABI\u003darm64-v8a \\\n  -DCMAKE_ANDROID_ARCH_ABI\u003darm64-v8a \\\n  -DANDROID_NDK\u003d/data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/28.2.13676358 \\\n  -DCMAKE_ANDROID_NDK\u003d/data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/28.2.13676358 \\\n  -DCMAKE_TOOLCHAIN_FILE\u003d/data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/28.2.13676358/build/cmake/android.toolchain.cmake \\\n  -DCMAKE_MAKE_PROGRAM\u003d/data/user/0/com.tom.rv2ide/files/home/android-sdk/cmake/4.1.2/bin/ninja \\\n  -DCMAKE_LIBRARY_OUTPUT_DIRECTORY\u003d/storage/emulated/0/AndroidIDEProjects/ProcTy/app/build/intermediates/cxx/Debug/644w2n5s/obj/arm64-v8a \\\n  -DCMAKE_RUNTIME_OUTPUT_DIRECTORY\u003d/storage/emulated/0/AndroidIDEProjects/ProcTy/app/build/intermediates/cxx/Debug/644w2n5s/obj/arm64-v8a \\\n  -DCMAKE_BUILD_TYPE\u003dDebug \\\n  -B/storage/emulated/0/AndroidIDEProjects/ProcTy/app/.cxx/Debug/644w2n5s/arm64-v8a \\\n  -GNinja\n",
+    "file_": "/storage/emulated/0/AndroidIDEProjects/ProcTy/app/src/main/cpp/CMakeLists.txt",
+    "tag_": "debug|arm64-v8a",
+    "diagnosticCode_": 0,
+    "memoizedIsInitialized": 1,
+    "unknownFields": {
+      "fields": {}
+    },
+    "memoizedSize": -1,
+    "memoizedHashCode": 0
+  },
+  {
+    "level_": 0,
+    "message_": "/data/user/0/com.tom.rv2ide/files/home/android-sdk/cmake/4.1.2/bin/cmake \\\n  -H/storage/emulated/0/AndroidIDEProjects/ProcTy/app/src/main/cpp \\\n  -DCMAKE_SYSTEM_NAME\u003dAndroid \\\n  -DCMAKE_EXPORT_COMPILE_COMMANDS\u003dON \\\n  -DCMAKE_SYSTEM_VERSION\u003d24 \\\n  -DANDROID_PLATFORM\u003dandroid-24 \\\n  -DANDROID_ABI\u003darm64-v8a \\\n  -DCMAKE_ANDROID_ARCH_ABI\u003darm64-v8a \\\n  -DANDROID_NDK\u003d/data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/28.2.13676358 \\\n  -DCMAKE_ANDROID_NDK\u003d/data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/28.2.13676358 \\\n  -DCMAKE_TOOLCHAIN_FILE\u003d/data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/28.2.13676358/build/cmake/android.toolchain.cmake \\\n  -DCMAKE_MAKE_PROGRAM\u003d/data/user/0/com.tom.rv2ide/files/home/android-sdk/cmake/4.1.2/bin/ninja \\\n  -DCMAKE_LIBRARY_OUTPUT_DIRECTORY\u003d/storage/emulated/0/AndroidIDEProjects/ProcTy/app/build/intermediates/cxx/Debug/644w2n5s/obj/arm64-v8a \\\n  -DCMAKE_RUNTIME_OUTPUT_DIRECTORY\u003d/storage/emulated/0/AndroidIDEProjects/ProcTy/app/build/intermediates/cxx/Debug/644w2n5s/obj/arm64-v8a \\\n  -DCMAKE_BUILD_TYPE\u003dDebug \\\n  -B/storage/emulated/0/AndroidIDEProjects/ProcTy/app/.cxx/Debug/644w2n5s/arm64-v8a \\\n  -GNinja\n",
+    "file_": "/storage/emulated/0/AndroidIDEProjects/ProcTy/app/src/main/cpp/CMakeLists.txt",
+    "tag_": "debug|arm64-v8a",
+    "diagnosticCode_": 0,
+    "memoizedIsInitialized": 1,
+    "unknownFields": {
+      "fields": {}
+    },
+    "memoizedSize": -1,
+    "memoizedHashCode": 0
+  },
+  {
+    "level_": 0,
+    "message_": "Received process result: 1",
+    "file_": "/storage/emulated/0/AndroidIDEProjects/ProcTy/app/src/main/cpp/CMakeLists.txt",
+    "tag_": "debug|arm64-v8a",
+    "diagnosticCode_": 0,
+    "memoizedIsInitialized": 1,
+    "unknownFields": {
+      "fields": {}
+    },
+    "memoizedSize": -1,
+    "memoizedHashCode": 0
+  },
+  {
+    "level_": 0,
+    "message_": "JSON generation completed with problem. Exception: com.android.ide.common.process.ProcessException: -- The C compiler identification is unknown\n-- The CXX compiler identification is unknown\n-- Detecting C compiler ABI info\n-- Detecting C compiler ABI info - failed\n-- Check for working C compiler: /data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/bin/clang\n-- Check for working C compiler: /data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/bin/clang - broken\n-- Configuring incomplete, errors occurred!\n\nC++ build system [configure] failed while executing:\n    /data/user/0/com.tom.rv2ide/files/home/android-sdk/cmake/4.1.2/bin/cmake \\\n      -H/storage/emulated/0/AndroidIDEProjects/ProcTy/app/src/main/cpp \\\n      -DCMAKE_SYSTEM_NAME\u003dAndroid \\\n      -DCMAKE_EXPORT_COMPILE_COMMANDS\u003dON \\\n      -DCMAKE_SYSTEM_VERSION\u003d24 \\\n      -DANDROID_PLATFORM\u003dandroid-24 \\\n      -DANDROID_ABI\u003darm64-v8a \\\n      -DCMAKE_ANDROID_ARCH_ABI\u003darm64-v8a \\\n      -DANDROID_NDK\u003d/data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/28.2.13676358 \\\n      -DCMAKE_ANDROID_NDK\u003d/data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/28.2.13676358 \\\n      -DCMAKE_TOOLCHAIN_FILE\u003d/data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/28.2.13676358/build/cmake/android.toolchain.cmake \\\n      -DCMAKE_MAKE_PROGRAM\u003d/data/user/0/com.tom.rv2ide/files/home/android-sdk/cmake/4.1.2/bin/ninja \\\n      -DCMAKE_LIBRARY_OUTPUT_DIRECTORY\u003d/storage/emulated/0/AndroidIDEProjects/ProcTy/app/build/intermediates/cxx/Debug/644w2n5s/obj/arm64-v8a \\\n      -DCMAKE_RUNTIME_OUTPUT_DIRECTORY\u003d/storage/emulated/0/AndroidIDEProjects/ProcTy/app/build/intermediates/cxx/Debug/644w2n5s/obj/arm64-v8a \\\n      -DCMAKE_BUILD_TYPE\u003dDebug \\\n      -B/storage/emulated/0/AndroidIDEProjects/ProcTy/app/.cxx/Debug/644w2n5s/arm64-v8a \\\n      -GNinja\n  from /storage/emulated/0/AndroidIDEProjects/ProcTy/app\nCMake Error at /data/user/0/com.tom.rv2ide/files/home/android-sdk/cmake/4.1.2/share/cmake-4.1/Modules/CMakeTestCCompiler.cmake:67 (message):\n  The C compiler\n\n    \"/data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/bin/clang\"\n\n  is not able to compile a simple test program.\n\n  It fails with the following output:\n\n    Change Dir: \u0027/storage/emulated/0/AndroidIDEProjects/ProcTy/app/.cxx/Debug/644w2n5s/arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-aeDdad\u0027\n    \n    Run Build Command(s): /data/user/0/com.tom.rv2ide/files/home/android-sdk/cmake/4.1.2/bin/ninja -v cmTC_2125a\n    [1/2] /data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/bin/clang   -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE\u003d2 -Wformat -Werror\u003dformat-security -o CMakeFiles/cmTC_2125a.dir/testCCompiler.c.o -c /storage/emulated/0/AndroidIDEProjects/ProcTy/app/.cxx/Debug/644w2n5s/arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-aeDdad/testCCompiler.c\n    FAILED: CMakeFiles/cmTC_2125a.dir/testCCompiler.c.o \n    /data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/bin/clang   -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE\u003d2 -Wformat -Werror\u003dformat-security -o CMakeFiles/cmTC_2125a.dir/testCCompiler.c.o -c /storage/emulated/0/AndroidIDEProjects/ProcTy/app/.cxx/Debug/644w2n5s/arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-aeDdad/testCCompiler.c\n    /bin/sh: /data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/bin/clang: not executable: 64-bit ELF file\n    ninja: build stopped: subcommand failed.\n    \n    \n\n\n\n  CMake will not be able to correctly generate this project.\nCall Stack (most recent call first):\n  CMakeLists.txt:2 (project)",
+    "file_": "/storage/emulated/0/AndroidIDEProjects/ProcTy/app/src/main/cpp/CMakeLists.txt",
+    "tag_": "debug|arm64-v8a",
+    "diagnosticCode_": 0,
+    "memoizedIsInitialized": 1,
+    "unknownFields": {
+      "fields": {}
+    },
+    "memoizedSize": -1,
+    "memoizedHashCode": 0
+  }
+]

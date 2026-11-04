@@ -1,0 +1,119 @@
+[
+  {
+    "level_": 0,
+    "message_": "Start JSON generation. Platform version: 29 min SDK version: arm64-v8a",
+    "file_": "/storage/emulated/0/AndroidIDEProjects/ProcTy/app/src/main/cpp/CMakeLists.txt",
+    "tag_": "debug|arm64-v8a",
+    "diagnosticCode_": 0,
+    "memoizedIsInitialized": 1,
+    "unknownFields": {
+      "fields": {}
+    },
+    "memoizedSize": -1,
+    "memoizedHashCode": 0
+  },
+  {
+    "level_": 0,
+    "message_": "rebuilding JSON /storage/emulated/0/AndroidIDEProjects/ProcTy/app/.cxx/Debug/5x143h4e/arm64-v8a/android_gradle_build.json due to:",
+    "file_": "/storage/emulated/0/AndroidIDEProjects/ProcTy/app/src/main/cpp/CMakeLists.txt",
+    "tag_": "debug|arm64-v8a",
+    "diagnosticCode_": 0,
+    "memoizedIsInitialized": 1,
+    "unknownFields": {
+      "fields": {}
+    },
+    "memoizedSize": -1,
+    "memoizedHashCode": 0
+  },
+  {
+    "level_": 0,
+    "message_": "- no fingerprint file, will remove stale configuration folder",
+    "file_": "/storage/emulated/0/AndroidIDEProjects/ProcTy/app/src/main/cpp/CMakeLists.txt",
+    "tag_": "debug|arm64-v8a",
+    "diagnosticCode_": 0,
+    "memoizedIsInitialized": 1,
+    "unknownFields": {
+      "fields": {}
+    },
+    "memoizedSize": -1,
+    "memoizedHashCode": 0
+  },
+  {
+    "level_": 0,
+    "message_": "removing stale contents from \u0027/storage/emulated/0/AndroidIDEProjects/ProcTy/app/.cxx/Debug/5x143h4e/arm64-v8a\u0027",
+    "file_": "/storage/emulated/0/AndroidIDEProjects/ProcTy/app/src/main/cpp/CMakeLists.txt",
+    "tag_": "debug|arm64-v8a",
+    "diagnosticCode_": 0,
+    "memoizedIsInitialized": 1,
+    "unknownFields": {
+      "fields": {}
+    },
+    "memoizedSize": -1,
+    "memoizedHashCode": 0
+  },
+  {
+    "level_": 0,
+    "message_": "created folder \u0027/storage/emulated/0/AndroidIDEProjects/ProcTy/app/.cxx/Debug/5x143h4e/arm64-v8a\u0027",
+    "file_": "/storage/emulated/0/AndroidIDEProjects/ProcTy/app/src/main/cpp/CMakeLists.txt",
+    "tag_": "debug|arm64-v8a",
+    "diagnosticCode_": 0,
+    "memoizedIsInitialized": 1,
+    "unknownFields": {
+      "fields": {}
+    },
+    "memoizedSize": -1,
+    "memoizedHashCode": 0
+  },
+  {
+    "level_": 0,
+    "message_": "executing cmake /data/user/0/com.tom.rv2ide/files/home/android-sdk/cmake/4.1.2/bin/cmake \\\n  -H/storage/emulated/0/AndroidIDEProjects/ProcTy/app/src/main/cpp \\\n  -DCMAKE_SYSTEM_NAME\u003dAndroid \\\n  -DCMAKE_EXPORT_COMPILE_COMMANDS\u003dON \\\n  -DCMAKE_SYSTEM_VERSION\u003d29 \\\n  -DANDROID_PLATFORM\u003dandroid-29 \\\n  -DANDROID_ABI\u003darm64-v8a \\\n  -DCMAKE_ANDROID_ARCH_ABI\u003darm64-v8a \\\n  -DANDROID_NDK\u003d/data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/27.3.13750724 \\\n  -DCMAKE_ANDROID_NDK\u003d/data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/27.3.13750724 \\\n  -DCMAKE_TOOLCHAIN_FILE\u003d/data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/27.3.13750724/build/cmake/android.toolchain.cmake \\\n  -DCMAKE_MAKE_PROGRAM\u003d/data/user/0/com.tom.rv2ide/files/home/android-sdk/cmake/4.1.2/bin/ninja \\\n  -DCMAKE_LIBRARY_OUTPUT_DIRECTORY\u003d/storage/emulated/0/AndroidIDEProjects/ProcTy/app/build/intermediates/cxx/Debug/5x143h4e/obj/arm64-v8a \\\n  -DCMAKE_RUNTIME_OUTPUT_DIRECTORY\u003d/storage/emulated/0/AndroidIDEProjects/ProcTy/app/build/intermediates/cxx/Debug/5x143h4e/obj/arm64-v8a \\\n  -DCMAKE_BUILD_TYPE\u003dDebug \\\n  -B/storage/emulated/0/AndroidIDEProjects/ProcTy/app/.cxx/Debug/5x143h4e/arm64-v8a \\\n  -GNinja\n",
+    "file_": "/storage/emulated/0/AndroidIDEProjects/ProcTy/app/src/main/cpp/CMakeLists.txt",
+    "tag_": "debug|arm64-v8a",
+    "diagnosticCode_": 0,
+    "memoizedIsInitialized": 1,
+    "unknownFields": {
+      "fields": {}
+    },
+    "memoizedSize": -1,
+    "memoizedHashCode": 0
+  },
+  {
+    "level_": 0,
+    "message_": "/data/user/0/com.tom.rv2ide/files/home/android-sdk/cmake/4.1.2/bin/cmake \\\n  -H/storage/emulated/0/AndroidIDEProjects/ProcTy/app/src/main/cpp \\\n  -DCMAKE_SYSTEM_NAME\u003dAndroid \\\n  -DCMAKE_EXPORT_COMPILE_COMMANDS\u003dON \\\n  -DCMAKE_SYSTEM_VERSION\u003d29 \\\n  -DANDROID_PLATFORM\u003dandroid-29 \\\n  -DANDROID_ABI\u003darm64-v8a \\\n  -DCMAKE_ANDROID_ARCH_ABI\u003darm64-v8a \\\n  -DANDROID_NDK\u003d/data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/27.3.13750724 \\\n  -DCMAKE_ANDROID_NDK\u003d/data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/27.3.13750724 \\\n  -DCMAKE_TOOLCHAIN_FILE\u003d/data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/27.3.13750724/build/cmake/android.toolchain.cmake \\\n  -DCMAKE_MAKE_PROGRAM\u003d/data/user/0/com.tom.rv2ide/files/home/android-sdk/cmake/4.1.2/bin/ninja \\\n  -DCMAKE_LIBRARY_OUTPUT_DIRECTORY\u003d/storage/emulated/0/AndroidIDEProjects/ProcTy/app/build/intermediates/cxx/Debug/5x143h4e/obj/arm64-v8a \\\n  -DCMAKE_RUNTIME_OUTPUT_DIRECTORY\u003d/storage/emulated/0/AndroidIDEProjects/ProcTy/app/build/intermediates/cxx/Debug/5x143h4e/obj/arm64-v8a \\\n  -DCMAKE_BUILD_TYPE\u003dDebug \\\n  -B/storage/emulated/0/AndroidIDEProjects/ProcTy/app/.cxx/Debug/5x143h4e/arm64-v8a \\\n  -GNinja\n",
+    "file_": "/storage/emulated/0/AndroidIDEProjects/ProcTy/app/src/main/cpp/CMakeLists.txt",
+    "tag_": "debug|arm64-v8a",
+    "diagnosticCode_": 0,
+    "memoizedIsInitialized": 1,
+    "unknownFields": {
+      "fields": {}
+    },
+    "memoizedSize": -1,
+    "memoizedHashCode": 0
+  },
+  {
+    "level_": 0,
+    "message_": "Received process result: 1",
+    "file_": "/storage/emulated/0/AndroidIDEProjects/ProcTy/app/src/main/cpp/CMakeLists.txt",
+    "tag_": "debug|arm64-v8a",
+    "diagnosticCode_": 0,
+    "memoizedIsInitialized": 1,
+    "unknownFields": {
+      "fields": {}
+    },
+    "memoizedSize": -1,
+    "memoizedHashCode": 0
+  },
+  {
+    "level_": 0,
+    "message_": "JSON generation completed with problem. Exception: com.android.ide.common.process.ProcessException: -- The C compiler identification is Clang 18.0.0\n-- The CXX compiler identification is Clang 18.0.0\n-- Detecting C compiler ABI info\n-- Detecting C compiler ABI info - failed\n-- Check for working C compiler: /data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/27.3.13750724/toolchains/llvm/prebuilt/linux-arm64/bin/clang\n-- Check for working C compiler: /data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/27.3.13750724/toolchains/llvm/prebuilt/linux-arm64/bin/clang - broken\n-- Configuring incomplete, errors occurred!\n\nC++ build system [configure] failed while executing:\n    /data/user/0/com.tom.rv2ide/files/home/android-sdk/cmake/4.1.2/bin/cmake \\\n      -H/storage/emulated/0/AndroidIDEProjects/ProcTy/app/src/main/cpp \\\n      -DCMAKE_SYSTEM_NAME\u003dAndroid \\\n      -DCMAKE_EXPORT_COMPILE_COMMANDS\u003dON \\\n      -DCMAKE_SYSTEM_VERSION\u003d29 \\\n      -DANDROID_PLATFORM\u003dandroid-29 \\\n      -DANDROID_ABI\u003darm64-v8a \\\n      -DCMAKE_ANDROID_ARCH_ABI\u003darm64-v8a \\\n      -DANDROID_NDK\u003d/data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/27.3.13750724 \\\n      -DCMAKE_ANDROID_NDK\u003d/data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/27.3.13750724 \\\n      -DCMAKE_TOOLCHAIN_FILE\u003d/data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/27.3.13750724/build/cmake/android.toolchain.cmake \\\n      -DCMAKE_MAKE_PROGRAM\u003d/data/user/0/com.tom.rv2ide/files/home/android-sdk/cmake/4.1.2/bin/ninja \\\n      -DCMAKE_LIBRARY_OUTPUT_DIRECTORY\u003d/storage/emulated/0/AndroidIDEProjects/ProcTy/app/build/intermediates/cxx/Debug/5x143h4e/obj/arm64-v8a \\\n      -DCMAKE_RUNTIME_OUTPUT_DIRECTORY\u003d/storage/emulated/0/AndroidIDEProjects/ProcTy/app/build/intermediates/cxx/Debug/5x143h4e/obj/arm64-v8a \\\n      -DCMAKE_BUILD_TYPE\u003dDebug \\\n      -B/storage/emulated/0/AndroidIDEProjects/ProcTy/app/.cxx/Debug/5x143h4e/arm64-v8a \\\n      -GNinja\n  from /storage/emulated/0/AndroidIDEProjects/ProcTy/app\nCMake Deprecation Warning at /data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/27.3.13750724/build/cmake/android.toolchain.cmake:35 (cmake_minimum_required):\n  Compatibility with CMake \u003c 3.10 will be removed from a future version of\n  CMake.\n\n  Update the VERSION argument \u003cmin\u003e value.  Or, use the \u003cmin\u003e...\u003cmax\u003e syntax\n  to tell CMake that the project requires at least \u003cmin\u003e but has been updated\n  to work with policies introduced by \u003cmax\u003e or earlier.\nCall Stack (most recent call first):\n  /data/user/0/com.tom.rv2ide/files/home/android-sdk/cmake/4.1.2/share/cmake-4.1/Modules/CMakeDetermineSystem.cmake:146 (include)\n  CMakeLists.txt:2 (project)\n\n\nCMake Deprecation Warning at /data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/27.3.13750724/build/cmake/android-legacy.toolchain.cmake:35 (cmake_minimum_required):\n  Compatibility with CMake \u003c 3.10 will be removed from a future version of\n  CMake.\n\n  Update the VERSION argument \u003cmin\u003e value.  Or, use the \u003cmin\u003e...\u003cmax\u003e syntax\n  to tell CMake that the project requires at least \u003cmin\u003e but has been updated\n  to work with policies introduced by \u003cmax\u003e or earlier.\nCall Stack (most recent call first):\n  /data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/27.3.13750724/build/cmake/android.toolchain.cmake:55 (include)\n  /data/user/0/com.tom.rv2ide/files/home/android-sdk/cmake/4.1.2/share/cmake-4.1/Modules/CMakeDetermineSystem.cmake:146 (include)\n  CMakeLists.txt:2 (project)\n\n\nCMake Deprecation Warning at /data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/27.3.13750724/build/cmake/android.toolchain.cmake:35 (cmake_minimum_required):\n  Compatibility with CMake \u003c 3.10 will be removed from a future version of\n  CMake.\n\n  Update the VERSION argument \u003cmin\u003e value.  Or, use the \u003cmin\u003e...\u003cmax\u003e syntax\n  to tell CMake that the project requires at least \u003cmin\u003e but has been updated\n  to work with policies introduced by \u003cmax\u003e or earlier.\nCall Stack (most recent call first):\n  /storage/emulated/0/AndroidIDEProjects/ProcTy/app/.cxx/Debug/5x143h4e/arm64-v8a/CMakeFiles/4.1.2-dirty/CMakeSystem.cmake:6 (include)\n  CMakeLists.txt:2 (project)\n\n\nCMake Deprecation Warning at /data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/27.3.13750724/build/cmake/flags.cmake:18 (cmake_minimum_required):\n  Compatibility with CMake \u003c 3.10 will be removed from a future version of\n  CMake.\n\n  Update the VERSION argument \u003cmin\u003e value.  Or, use the \u003cmin\u003e...\u003cmax\u003e syntax\n  to tell CMake that the project requires at least \u003cmin\u003e but has been updated\n  to work with policies introduced by \u003cmax\u003e or earlier.\nCall Stack (most recent call first):\n  /data/user/0/com.tom.rv2ide/files/home/android-sdk/cmake/4.1.2/share/cmake-4.1/Modules/Platform/Android-Clang.cmake:23 (include)\n  /data/user/0/com.tom.rv2ide/files/home/android-sdk/cmake/4.1.2/share/cmake-4.1/Modules/Platform/Android-Clang-C.cmake:1 (include)\n  /data/user/0/com.tom.rv2ide/files/home/android-sdk/cmake/4.1.2/share/cmake-4.1/Modules/CMakeCInformation.cmake:48 (include)\n  CMakeLists.txt:2 (project)\n\n\nCMake Deprecation Warning at /data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/27.3.13750724/build/cmake/android.toolchain.cmake:35 (cmake_minimum_required):\n  Compatibility with CMake \u003c 3.10 will be removed from a future version of\n  CMake.\n\n  Update the VERSION argument \u003cmin\u003e value.  Or, use the \u003cmin\u003e...\u003cmax\u003e syntax\n  to tell CMake that the project requires at least \u003cmin\u003e but has been updated\n  to work with policies introduced by \u003cmax\u003e or earlier.\nCall Stack (most recent call first):\n  /storage/emulated/0/AndroidIDEProjects/ProcTy/app/.cxx/Debug/5x143h4e/arm64-v8a/CMakeFiles/4.1.2-dirty/CMakeSystem.cmake:6 (include)\n  /storage/emulated/0/AndroidIDEProjects/ProcTy/app/.cxx/Debug/5x143h4e/arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-mAAdIj/CMakeLists.txt:4 (project)\n\n\nCMake Deprecation Warning at /data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/27.3.13750724/build/cmake/android-legacy.toolchain.cmake:35 (cmake_minimum_required):\n  Compatibility with CMake \u003c 3.10 will be removed from a future version of\n  CMake.\n\n  Update the VERSION argument \u003cmin\u003e value.  Or, use the \u003cmin\u003e...\u003cmax\u003e syntax\n  to tell CMake that the project requires at least \u003cmin\u003e but has been updated\n  to work with policies introduced by \u003cmax\u003e or earlier.\nCall Stack (most recent call first):\n  /data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/27.3.13750724/build/cmake/android.toolchain.cmake:55 (include)\n  /storage/emulated/0/AndroidIDEProjects/ProcTy/app/.cxx/Debug/5x143h4e/arm64-v8a/CMakeFiles/4.1.2-dirty/CMakeSystem.cmake:6 (include)\n  /storage/emulated/0/AndroidIDEProjects/ProcTy/app/.cxx/Debug/5x143h4e/arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-mAAdIj/CMakeLists.txt:4 (project)\n\n\nCMake Deprecation Warning at /data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/27.3.13750724/build/cmake/flags.cmake:18 (cmake_minimum_required):\n  Compatibility with CMake \u003c 3.10 will be removed from a future version of\n  CMake.\n\n  Update the VERSION argument \u003cmin\u003e value.  Or, use the \u003cmin\u003e...\u003cmax\u003e syntax\n  to tell CMake that the project requires at least \u003cmin\u003e but has been updated\n  to work with policies introduced by \u003cmax\u003e or earlier.\nCall Stack (most recent call first):\n  /data/user/0/com.tom.rv2ide/files/home/android-sdk/cmake/4.1.2/share/cmake-4.1/Modules/Platform/Android-Clang.cmake:23 (include)\n  /data/user/0/com.tom.rv2ide/files/home/android-sdk/cmake/4.1.2/share/cmake-4.1/Modules/Platform/Android-Clang-C.cmake:1 (include)\n  /data/user/0/com.tom.rv2ide/files/home/android-sdk/cmake/4.1.2/share/cmake-4.1/Modules/CMakeCInformation.cmake:48 (include)\n  /storage/emulated/0/AndroidIDEProjects/ProcTy/app/.cxx/Debug/5x143h4e/arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-mAAdIj/CMakeLists.txt:4 (project)\n\n\nCMake Deprecation Warning at /data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/27.3.13750724/build/cmake/android.toolchain.cmake:35 (cmake_minimum_required):\n  Compatibility with CMake \u003c 3.10 will be removed from a future version of\n  CMake.\n\n  Update the VERSION argument \u003cmin\u003e value.  Or, use the \u003cmin\u003e...\u003cmax\u003e syntax\n  to tell CMake that the project requires at least \u003cmin\u003e but has been updated\n  to work with policies introduced by \u003cmax\u003e or earlier.\nCall Stack (most recent call first):\n  /storage/emulated/0/AndroidIDEProjects/ProcTy/app/.cxx/Debug/5x143h4e/arm64-v8a/CMakeFiles/4.1.2-dirty/CMakeSystem.cmake:6 (include)\n  /storage/emulated/0/AndroidIDEProjects/ProcTy/app/.cxx/Debug/5x143h4e/arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-KcafMJ/CMakeLists.txt:4 (project)\n\n\nCMake Deprecation Warning at /data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/27.3.13750724/build/cmake/android-legacy.toolchain.cmake:35 (cmake_minimum_required):\n  Compatibility with CMake \u003c 3.10 will be removed from a future version of\n  CMake.\n\n  Update the VERSION argument \u003cmin\u003e value.  Or, use the \u003cmin\u003e...\u003cmax\u003e syntax\n  to tell CMake that the project requires at least \u003cmin\u003e but has been updated\n  to work with policies introduced by \u003cmax\u003e or earlier.\nCall Stack (most recent call first):\n  /data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/27.3.13750724/build/cmake/android.toolchain.cmake:55 (include)\n  /storage/emulated/0/AndroidIDEProjects/ProcTy/app/.cxx/Debug/5x143h4e/arm64-v8a/CMakeFiles/4.1.2-dirty/CMakeSystem.cmake:6 (include)\n  /storage/emulated/0/AndroidIDEProjects/ProcTy/app/.cxx/Debug/5x143h4e/arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-KcafMJ/CMakeLists.txt:4 (project)\n\n\nCMake Deprecation Warning at /data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/27.3.13750724/build/cmake/flags.cmake:18 (cmake_minimum_required):\n  Compatibility with CMake \u003c 3.10 will be removed from a future version of\n  CMake.\n\n  Update the VERSION argument \u003cmin\u003e value.  Or, use the \u003cmin\u003e...\u003cmax\u003e syntax\n  to tell CMake that the project requires at least \u003cmin\u003e but has been updated\n  to work with policies introduced by \u003cmax\u003e or earlier.\nCall Stack (most recent call first):\n  /data/user/0/com.tom.rv2ide/files/home/android-sdk/cmake/4.1.2/share/cmake-4.1/Modules/Platform/Android-Clang.cmake:23 (include)\n  /data/user/0/com.tom.rv2ide/files/home/android-sdk/cmake/4.1.2/share/cmake-4.1/Modules/Platform/Android-Clang-C.cmake:1 (include)\n  /data/user/0/com.tom.rv2ide/files/home/android-sdk/cmake/4.1.2/share/cmake-4.1/Modules/CMakeCInformation.cmake:48 (include)\n  /storage/emulated/0/AndroidIDEProjects/ProcTy/app/.cxx/Debug/5x143h4e/arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-KcafMJ/CMakeLists.txt:4 (project)\n\n\nCMake Error at /data/user/0/com.tom.rv2ide/files/home/android-sdk/cmake/4.1.2/share/cmake-4.1/Modules/CMakeTestCCompiler.cmake:67 (message):\n  The C compiler\n\n    \"/data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/27.3.13750724/toolchains/llvm/prebuilt/linux-arm64/bin/clang\"\n\n  is not able to compile a simple test program.\n\n  It fails with the following output:\n\n    Change Dir: \u0027/storage/emulated/0/AndroidIDEProjects/ProcTy/app/.cxx/Debug/5x143h4e/arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-KcafMJ\u0027\n    \n    Run Build Command(s): /data/user/0/com.tom.rv2ide/files/home/android-sdk/cmake/4.1.2/bin/ninja -v cmTC_fd1f8\n    [1/2] /data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/27.3.13750724/toolchains/llvm/prebuilt/linux-arm64/bin/clang --target\u003daarch64-none-linux-android29 --sysroot\u003d/data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/27.3.13750724/toolchains/llvm/prebuilt/linux-arm64/sysroot   -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE\u003d2 -Wformat -Werror\u003dformat-security   -fPIE -MD -MT CMakeFiles/cmTC_fd1f8.dir/testCCompiler.c.o -MF CMakeFiles/cmTC_fd1f8.dir/testCCompiler.c.o.d -o CMakeFiles/cmTC_fd1f8.dir/testCCompiler.c.o -c /storage/emulated/0/AndroidIDEProjects/ProcTy/app/.cxx/Debug/5x143h4e/arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-KcafMJ/testCCompiler.c\n    [2/2] : \u0026\u0026 /data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/27.3.13750724/toolchains/llvm/prebuilt/linux-arm64/bin/clang --target\u003daarch64-none-linux-android29 --sysroot\u003d/data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/27.3.13750724/toolchains/llvm/prebuilt/linux-arm64/sysroot -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE\u003d2 -Wformat -Werror\u003dformat-security -static-libstdc++ -Wl,--build-id\u003dsha1 -Wl,--no-rosegment -Wl,--no-undefined-version -Wl,--fatal-warnings -Wl,--no-undefined -Qunused-arguments CMakeFiles/cmTC_fd1f8.dir/testCCompiler.c.o -o cmTC_fd1f8  -latomic -lm \u0026\u0026 :\n    FAILED: cmTC_fd1f8 \n    : \u0026\u0026 /data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/27.3.13750724/toolchains/llvm/prebuilt/linux-arm64/bin/clang --target\u003daarch64-none-linux-android29 --sysroot\u003d/data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/27.3.13750724/toolchains/llvm/prebuilt/linux-arm64/sysroot -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE\u003d2 -Wformat -Werror\u003dformat-security -static-libstdc++ -Wl,--build-id\u003dsha1 -Wl,--no-rosegment -Wl,--no-undefined-version -Wl,--fatal-warnings -Wl,--no-undefined -Qunused-arguments CMakeFiles/cmTC_fd1f8.dir/testCCompiler.c.o -o cmTC_fd1f8  -latomic -lm \u0026\u0026 :\n    error: \"/data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/27.3.13750724/toolchains/llvm/prebuilt/linux-arm64/bin/ld.lld\": executable\u0027s TLS segment is underaligned: alignment is 8 (skew 0), needs to be at least 64 for ARM64 Bionic\n    clang: error: unable to execute command: Aborted\n    clang: error: linker command failed due to signal (use -v to see invocation)\n    ninja: build stopped: subcommand failed.\n    \n    \n\n\n\n  CMake will not be able to correctly generate this project.\nCall Stack (most recent call first):\n  CMakeLists.txt:2 (project)",
+    "file_": "/storage/emulated/0/AndroidIDEProjects/ProcTy/app/src/main/cpp/CMakeLists.txt",
+    "tag_": "debug|arm64-v8a",
+    "diagnosticCode_": 0,
+    "memoizedIsInitialized": 1,
+    "unknownFields": {
+      "fields": {}
+    },
+    "memoizedSize": -1,
+    "memoizedHashCode": 0
+  }
+]

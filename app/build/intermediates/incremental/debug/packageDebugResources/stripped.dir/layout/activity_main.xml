@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#121212"
+    android:gravity="center"
+    android:orientation="vertical"
+    android:padding="24dp">
+
+    <!-- Tiêu đề ứng dụng -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="PROCTY COMMAND CENTER"
+        android:textColor="#FF3333"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:letterSpacing="0.1"
+        android:layout_marginBottom="8dp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Helio P35 Low-Latency Optimization Suite"
+        android:textColor="#888888"
+        android:textSize="12sp"
+        android:layout_marginBottom="40dp" />
+
+    <!-- Nút 1: Kiểm tra Shizuku -->
+    <Button
+        android:id="@+id/btnCheckShizuku"
+        android:layout_width="match_parent"
+        android:layout_height="55dp"
+        android:backgroundTint="#2D2D2D"
+        android:text="🔍 Kiểm Tra Shizuku"
+        android:textColor="#FFFFFF"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="16dp" />
+
+    <!-- Nút 2: Khởi chạy ProcTy -->
+    <Button
+        android:id="@+id/btnStartProcTy"
+        android:layout_width="match_parent"
+        android:layout_height="60dp"
+        android:backgroundTint="#B30000"
+        android:text="⚡ ProcTy Sẵn Sàng"
+        android:textColor="#FFFFFF"
+        android:textSize="16sp"
+        android:textStyle="bold" />
+
+</LinearLayout>

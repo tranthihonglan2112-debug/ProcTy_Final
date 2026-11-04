@@ -1,0 +1,7 @@
+-- The C compiler identification is unknown
+-- The CXX compiler identification is unknown
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - failed
+-- Check for working C compiler: /data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/bin/clang
+-- Check for working C compiler: /data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/bin/clang - broken
+-- Configuring incomplete, errors occurred!

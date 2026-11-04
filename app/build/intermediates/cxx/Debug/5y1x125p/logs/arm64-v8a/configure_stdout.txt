@@ -1,0 +1,7 @@
+-- The C compiler identification is Clang 18.0.0
+-- The CXX compiler identification is Clang 18.0.0
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - failed
+-- Check for working C compiler: /data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/27.3.13750724/toolchains/llvm/prebuilt/linux-arm64/bin/clang
+-- Check for working C compiler: /data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/27.3.13750724/toolchains/llvm/prebuilt/linux-arm64/bin/clang - broken
+-- Configuring incomplete, errors occurred!

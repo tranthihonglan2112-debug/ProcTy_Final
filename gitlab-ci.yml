@@ -1,0 +1,18 @@
+image: mingc/android-build-box:latest
+
+stages:
+  - build
+
+build_apk:
+  stage: build
+  script:
+    - chmod +x ./gradlew
+    - ./gradlew assembleDebug
+  artifacts:
+    paths:
+      - app/build/outputs/apk/debug/app-debug.apk
+    expire_in: 1 week
+  only:
+    - main
+    - master
+  when: manual # Chỉ build khi bấm nút thủ công

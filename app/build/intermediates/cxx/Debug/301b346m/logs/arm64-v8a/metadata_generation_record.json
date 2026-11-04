@@ -1,0 +1,119 @@
+[
+  {
+    "level_": 0,
+    "message_": "Start JSON generation. Platform version: 24 min SDK version: arm64-v8a",
+    "file_": "/storage/emulated/0/AndroidIDEProjects/ProcTy/app/src/main/cpp/CMakeLists.txt",
+    "tag_": "debug|arm64-v8a",
+    "diagnosticCode_": 0,
+    "memoizedIsInitialized": 1,
+    "unknownFields": {
+      "fields": {}
+    },
+    "memoizedSize": -1,
+    "memoizedHashCode": 0
+  },
+  {
+    "level_": 0,
+    "message_": "rebuilding JSON /storage/emulated/0/AndroidIDEProjects/ProcTy/app/.cxx/Debug/301b346m/arm64-v8a/android_gradle_build.json due to:",
+    "file_": "/storage/emulated/0/AndroidIDEProjects/ProcTy/app/src/main/cpp/CMakeLists.txt",
+    "tag_": "debug|arm64-v8a",
+    "diagnosticCode_": 0,
+    "memoizedIsInitialized": 1,
+    "unknownFields": {
+      "fields": {}
+    },
+    "memoizedSize": -1,
+    "memoizedHashCode": 0
+  },
+  {
+    "level_": 0,
+    "message_": "- no fingerprint file, will remove stale configuration folder",
+    "file_": "/storage/emulated/0/AndroidIDEProjects/ProcTy/app/src/main/cpp/CMakeLists.txt",
+    "tag_": "debug|arm64-v8a",
+    "diagnosticCode_": 0,
+    "memoizedIsInitialized": 1,
+    "unknownFields": {
+      "fields": {}
+    },
+    "memoizedSize": -1,
+    "memoizedHashCode": 0
+  },
+  {
+    "level_": 0,
+    "message_": "removing stale contents from \u0027/storage/emulated/0/AndroidIDEProjects/ProcTy/app/.cxx/Debug/301b346m/arm64-v8a\u0027",
+    "file_": "/storage/emulated/0/AndroidIDEProjects/ProcTy/app/src/main/cpp/CMakeLists.txt",
+    "tag_": "debug|arm64-v8a",
+    "diagnosticCode_": 0,
+    "memoizedIsInitialized": 1,
+    "unknownFields": {
+      "fields": {}
+    },
+    "memoizedSize": -1,
+    "memoizedHashCode": 0
+  },
+  {
+    "level_": 0,
+    "message_": "created folder \u0027/storage/emulated/0/AndroidIDEProjects/ProcTy/app/.cxx/Debug/301b346m/arm64-v8a\u0027",
+    "file_": "/storage/emulated/0/AndroidIDEProjects/ProcTy/app/src/main/cpp/CMakeLists.txt",
+    "tag_": "debug|arm64-v8a",
+    "diagnosticCode_": 0,
+    "memoizedIsInitialized": 1,
+    "unknownFields": {
+      "fields": {}
+    },
+    "memoizedSize": -1,
+    "memoizedHashCode": 0
+  },
+  {
+    "level_": 0,
+    "message_": "executing cmake /data/user/0/com.tom.rv2ide/files/home/android-sdk/cmake/4.1.2/bin/cmake \\\n  -H/storage/emulated/0/AndroidIDEProjects/ProcTy/app/src/main/cpp \\\n  -DCMAKE_SYSTEM_NAME\u003dAndroid \\\n  -DCMAKE_EXPORT_COMPILE_COMMANDS\u003dON \\\n  -DCMAKE_SYSTEM_VERSION\u003d24 \\\n  -DANDROID_PLATFORM\u003dandroid-24 \\\n  -DANDROID_ABI\u003darm64-v8a \\\n  -DCMAKE_ANDROID_ARCH_ABI\u003darm64-v8a \\\n  -DANDROID_NDK\u003d/data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/24.0.8215888 \\\n  -DCMAKE_ANDROID_NDK\u003d/data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/24.0.8215888 \\\n  -DCMAKE_TOOLCHAIN_FILE\u003d/data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/24.0.8215888/build/cmake/android.toolchain.cmake \\\n  -DCMAKE_MAKE_PROGRAM\u003d/data/user/0/com.tom.rv2ide/files/home/android-sdk/cmake/4.1.2/bin/ninja \\\n  -DCMAKE_LIBRARY_OUTPUT_DIRECTORY\u003d/storage/emulated/0/AndroidIDEProjects/ProcTy/app/build/intermediates/cxx/Debug/301b346m/obj/arm64-v8a \\\n  -DCMAKE_RUNTIME_OUTPUT_DIRECTORY\u003d/storage/emulated/0/AndroidIDEProjects/ProcTy/app/build/intermediates/cxx/Debug/301b346m/obj/arm64-v8a \\\n  -DCMAKE_BUILD_TYPE\u003dDebug \\\n  -B/storage/emulated/0/AndroidIDEProjects/ProcTy/app/.cxx/Debug/301b346m/arm64-v8a \\\n  -GNinja\n",
+    "file_": "/storage/emulated/0/AndroidIDEProjects/ProcTy/app/src/main/cpp/CMakeLists.txt",
+    "tag_": "debug|arm64-v8a",
+    "diagnosticCode_": 0,
+    "memoizedIsInitialized": 1,
+    "unknownFields": {
+      "fields": {}
+    },
+    "memoizedSize": -1,
+    "memoizedHashCode": 0
+  },
+  {
+    "level_": 0,
+    "message_": "/data/user/0/com.tom.rv2ide/files/home/android-sdk/cmake/4.1.2/bin/cmake \\\n  -H/storage/emulated/0/AndroidIDEProjects/ProcTy/app/src/main/cpp \\\n  -DCMAKE_SYSTEM_NAME\u003dAndroid \\\n  -DCMAKE_EXPORT_COMPILE_COMMANDS\u003dON \\\n  -DCMAKE_SYSTEM_VERSION\u003d24 \\\n  -DANDROID_PLATFORM\u003dandroid-24 \\\n  -DANDROID_ABI\u003darm64-v8a \\\n  -DCMAKE_ANDROID_ARCH_ABI\u003darm64-v8a \\\n  -DANDROID_NDK\u003d/data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/24.0.8215888 \\\n  -DCMAKE_ANDROID_NDK\u003d/data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/24.0.8215888 \\\n  -DCMAKE_TOOLCHAIN_FILE\u003d/data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/24.0.8215888/build/cmake/android.toolchain.cmake \\\n  -DCMAKE_MAKE_PROGRAM\u003d/data/user/0/com.tom.rv2ide/files/home/android-sdk/cmake/4.1.2/bin/ninja \\\n  -DCMAKE_LIBRARY_OUTPUT_DIRECTORY\u003d/storage/emulated/0/AndroidIDEProjects/ProcTy/app/build/intermediates/cxx/Debug/301b346m/obj/arm64-v8a \\\n  -DCMAKE_RUNTIME_OUTPUT_DIRECTORY\u003d/storage/emulated/0/AndroidIDEProjects/ProcTy/app/build/intermediates/cxx/Debug/301b346m/obj/arm64-v8a \\\n  -DCMAKE_BUILD_TYPE\u003dDebug \\\n  -B/storage/emulated/0/AndroidIDEProjects/ProcTy/app/.cxx/Debug/301b346m/arm64-v8a \\\n  -GNinja\n",
+    "file_": "/storage/emulated/0/AndroidIDEProjects/ProcTy/app/src/main/cpp/CMakeLists.txt",
+    "tag_": "debug|arm64-v8a",
+    "diagnosticCode_": 0,
+    "memoizedIsInitialized": 1,
+    "unknownFields": {
+      "fields": {}
+    },
+    "memoizedSize": -1,
+    "memoizedHashCode": 0
+  },
+  {
+    "level_": 0,
+    "message_": "Received process result: 1",
+    "file_": "/storage/emulated/0/AndroidIDEProjects/ProcTy/app/src/main/cpp/CMakeLists.txt",
+    "tag_": "debug|arm64-v8a",
+    "diagnosticCode_": 0,
+    "memoizedIsInitialized": 1,
+    "unknownFields": {
+      "fields": {}
+    },
+    "memoizedSize": -1,
+    "memoizedHashCode": 0
+  },
+  {
+    "level_": 0,
+    "message_": "JSON generation completed with problem. Exception: com.android.ide.common.process.ProcessException: -- Android: Targeting API \u002724\u0027 with architecture \u0027arm64\u0027, ABI \u0027arm64-v8a\u0027, and processor \u0027aarch64\u0027\n-- Android: Selected Clang toolchain \u0027aarch64-linux-android-clang\u0027 with GCC toolchain \u0027\u0027\n-- The C compiler identification is unknown\n-- The CXX compiler identification is unknown\n-- Configuring incomplete, errors occurred!\n\nC++ build system [configure] failed while executing:\n    /data/user/0/com.tom.rv2ide/files/home/android-sdk/cmake/4.1.2/bin/cmake \\\n      -H/storage/emulated/0/AndroidIDEProjects/ProcTy/app/src/main/cpp \\\n      -DCMAKE_SYSTEM_NAME\u003dAndroid \\\n      -DCMAKE_EXPORT_COMPILE_COMMANDS\u003dON \\\n      -DCMAKE_SYSTEM_VERSION\u003d24 \\\n      -DANDROID_PLATFORM\u003dandroid-24 \\\n      -DANDROID_ABI\u003darm64-v8a \\\n      -DCMAKE_ANDROID_ARCH_ABI\u003darm64-v8a \\\n      -DANDROID_NDK\u003d/data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/24.0.8215888 \\\n      -DCMAKE_ANDROID_NDK\u003d/data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/24.0.8215888 \\\n      -DCMAKE_TOOLCHAIN_FILE\u003d/data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/24.0.8215888/build/cmake/android.toolchain.cmake \\\n      -DCMAKE_MAKE_PROGRAM\u003d/data/user/0/com.tom.rv2ide/files/home/android-sdk/cmake/4.1.2/bin/ninja \\\n      -DCMAKE_LIBRARY_OUTPUT_DIRECTORY\u003d/storage/emulated/0/AndroidIDEProjects/ProcTy/app/build/intermediates/cxx/Debug/301b346m/obj/arm64-v8a \\\n      -DCMAKE_RUNTIME_OUTPUT_DIRECTORY\u003d/storage/emulated/0/AndroidIDEProjects/ProcTy/app/build/intermediates/cxx/Debug/301b346m/obj/arm64-v8a \\\n      -DCMAKE_BUILD_TYPE\u003dDebug \\\n      -B/storage/emulated/0/AndroidIDEProjects/ProcTy/app/.cxx/Debug/301b346m/arm64-v8a \\\n      -GNinja\n  from /storage/emulated/0/AndroidIDEProjects/ProcTy/app\nCMake Deprecation Warning at /data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/24.0.8215888/build/cmake/android.toolchain.cmake:34 (cmake_minimum_required):\n  Compatibility with CMake \u003c 3.10 will be removed from a future version of\n  CMake.\n\n  Update the VERSION argument \u003cmin\u003e value.  Or, use the \u003cmin\u003e...\u003cmax\u003e syntax\n  to tell CMake that the project requires at least \u003cmin\u003e but has been updated\n  to work with policies introduced by \u003cmax\u003e or earlier.\nCall Stack (most recent call first):\n  /data/user/0/com.tom.rv2ide/files/home/android-sdk/cmake/4.1.2/share/cmake-4.1/Modules/CMakeDetermineSystem.cmake:146 (include)\n  CMakeLists.txt:2 (project)\n\n\nCMake Deprecation Warning at /data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/24.0.8215888/build/cmake/android.toolchain.cmake:34 (cmake_minimum_required):\n  Compatibility with CMake \u003c 3.10 will be removed from a future version of\n  CMake.\n\n  Update the VERSION argument \u003cmin\u003e value.  Or, use the \u003cmin\u003e...\u003cmax\u003e syntax\n  to tell CMake that the project requires at least \u003cmin\u003e but has been updated\n  to work with policies introduced by \u003cmax\u003e or earlier.\nCall Stack (most recent call first):\n  /storage/emulated/0/AndroidIDEProjects/ProcTy/app/.cxx/Debug/301b346m/arm64-v8a/CMakeFiles/4.1.2-dirty/CMakeSystem.cmake:6 (include)\n  CMakeLists.txt:2 (project)\n\n\nCMake Error at CMakeLists.txt:2 (project):\n  The CMAKE_C_COMPILER:\n\n    /data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/24.0.8215888/toolchains/llvm/prebuilt/linux-x86/bin/clang\n\n  is not a full path to an existing compiler tool.\n\n  Tell CMake where to find the compiler by setting either the environment\n  variable \"CC\" or the CMake cache entry CMAKE_C_COMPILER to the full path to\n  the compiler, or to the compiler name if it is in the PATH.\n\n\nCMake Error at CMakeLists.txt:2 (project):\n  The CMAKE_CXX_COMPILER:\n\n    /data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/24.0.8215888/toolchains/llvm/prebuilt/linux-x86/bin/clang++\n\n  is not a full path to an existing compiler tool.\n\n  Tell CMake where to find the compiler by setting either the environment\n  variable \"CXX\" or the CMake cache entry CMAKE_CXX_COMPILER to the full path\n  to the compiler, or to the compiler name if it is in the PATH.",
+    "file_": "/storage/emulated/0/AndroidIDEProjects/ProcTy/app/src/main/cpp/CMakeLists.txt",
+    "tag_": "debug|arm64-v8a",
+    "diagnosticCode_": 0,
+    "memoizedIsInitialized": 1,
+    "unknownFields": {
+      "fields": {}
+    },
+    "memoizedSize": -1,
+    "memoizedHashCode": 0
+  }
+]

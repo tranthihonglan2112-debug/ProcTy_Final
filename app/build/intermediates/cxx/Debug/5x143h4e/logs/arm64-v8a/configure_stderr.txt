@@ -1,0 +1,159 @@
+CMake Deprecation Warning at /data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/27.3.13750724/build/cmake/android.toolchain.cmake:35 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /data/user/0/com.tom.rv2ide/files/home/android-sdk/cmake/4.1.2/share/cmake-4.1/Modules/CMakeDetermineSystem.cmake:146 (include)
+  CMakeLists.txt:2 (project)
+
+
+CMake Deprecation Warning at /data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/27.3.13750724/build/cmake/android-legacy.toolchain.cmake:35 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/27.3.13750724/build/cmake/android.toolchain.cmake:55 (include)
+  /data/user/0/com.tom.rv2ide/files/home/android-sdk/cmake/4.1.2/share/cmake-4.1/Modules/CMakeDetermineSystem.cmake:146 (include)
+  CMakeLists.txt:2 (project)
+
+
+CMake Deprecation Warning at /data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/27.3.13750724/build/cmake/android.toolchain.cmake:35 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /storage/emulated/0/AndroidIDEProjects/ProcTy/app/.cxx/Debug/5x143h4e/arm64-v8a/CMakeFiles/4.1.2-dirty/CMakeSystem.cmake:6 (include)
+  CMakeLists.txt:2 (project)
+
+
+CMake Deprecation Warning at /data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/27.3.13750724/build/cmake/flags.cmake:18 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /data/user/0/com.tom.rv2ide/files/home/android-sdk/cmake/4.1.2/share/cmake-4.1/Modules/Platform/Android-Clang.cmake:23 (include)
+  /data/user/0/com.tom.rv2ide/files/home/android-sdk/cmake/4.1.2/share/cmake-4.1/Modules/Platform/Android-Clang-C.cmake:1 (include)
+  /data/user/0/com.tom.rv2ide/files/home/android-sdk/cmake/4.1.2/share/cmake-4.1/Modules/CMakeCInformation.cmake:48 (include)
+  CMakeLists.txt:2 (project)
+
+
+CMake Deprecation Warning at /data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/27.3.13750724/build/cmake/android.toolchain.cmake:35 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /storage/emulated/0/AndroidIDEProjects/ProcTy/app/.cxx/Debug/5x143h4e/arm64-v8a/CMakeFiles/4.1.2-dirty/CMakeSystem.cmake:6 (include)
+  /storage/emulated/0/AndroidIDEProjects/ProcTy/app/.cxx/Debug/5x143h4e/arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-mAAdIj/CMakeLists.txt:4 (project)
+
+
+CMake Deprecation Warning at /data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/27.3.13750724/build/cmake/android-legacy.toolchain.cmake:35 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/27.3.13750724/build/cmake/android.toolchain.cmake:55 (include)
+  /storage/emulated/0/AndroidIDEProjects/ProcTy/app/.cxx/Debug/5x143h4e/arm64-v8a/CMakeFiles/4.1.2-dirty/CMakeSystem.cmake:6 (include)
+  /storage/emulated/0/AndroidIDEProjects/ProcTy/app/.cxx/Debug/5x143h4e/arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-mAAdIj/CMakeLists.txt:4 (project)
+
+
+CMake Deprecation Warning at /data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/27.3.13750724/build/cmake/flags.cmake:18 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /data/user/0/com.tom.rv2ide/files/home/android-sdk/cmake/4.1.2/share/cmake-4.1/Modules/Platform/Android-Clang.cmake:23 (include)
+  /data/user/0/com.tom.rv2ide/files/home/android-sdk/cmake/4.1.2/share/cmake-4.1/Modules/Platform/Android-Clang-C.cmake:1 (include)
+  /data/user/0/com.tom.rv2ide/files/home/android-sdk/cmake/4.1.2/share/cmake-4.1/Modules/CMakeCInformation.cmake:48 (include)
+  /storage/emulated/0/AndroidIDEProjects/ProcTy/app/.cxx/Debug/5x143h4e/arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-mAAdIj/CMakeLists.txt:4 (project)
+
+
+CMake Deprecation Warning at /data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/27.3.13750724/build/cmake/android.toolchain.cmake:35 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /storage/emulated/0/AndroidIDEProjects/ProcTy/app/.cxx/Debug/5x143h4e/arm64-v8a/CMakeFiles/4.1.2-dirty/CMakeSystem.cmake:6 (include)
+  /storage/emulated/0/AndroidIDEProjects/ProcTy/app/.cxx/Debug/5x143h4e/arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-KcafMJ/CMakeLists.txt:4 (project)
+
+
+CMake Deprecation Warning at /data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/27.3.13750724/build/cmake/android-legacy.toolchain.cmake:35 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/27.3.13750724/build/cmake/android.toolchain.cmake:55 (include)
+  /storage/emulated/0/AndroidIDEProjects/ProcTy/app/.cxx/Debug/5x143h4e/arm64-v8a/CMakeFiles/4.1.2-dirty/CMakeSystem.cmake:6 (include)
+  /storage/emulated/0/AndroidIDEProjects/ProcTy/app/.cxx/Debug/5x143h4e/arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-KcafMJ/CMakeLists.txt:4 (project)
+
+
+CMake Deprecation Warning at /data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/27.3.13750724/build/cmake/flags.cmake:18 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /data/user/0/com.tom.rv2ide/files/home/android-sdk/cmake/4.1.2/share/cmake-4.1/Modules/Platform/Android-Clang.cmake:23 (include)
+  /data/user/0/com.tom.rv2ide/files/home/android-sdk/cmake/4.1.2/share/cmake-4.1/Modules/Platform/Android-Clang-C.cmake:1 (include)
+  /data/user/0/com.tom.rv2ide/files/home/android-sdk/cmake/4.1.2/share/cmake-4.1/Modules/CMakeCInformation.cmake:48 (include)
+  /storage/emulated/0/AndroidIDEProjects/ProcTy/app/.cxx/Debug/5x143h4e/arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-KcafMJ/CMakeLists.txt:4 (project)
+
+
+CMake Error at /data/user/0/com.tom.rv2ide/files/home/android-sdk/cmake/4.1.2/share/cmake-4.1/Modules/CMakeTestCCompiler.cmake:67 (message):
+  The C compiler
+
+    "/data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/27.3.13750724/toolchains/llvm/prebuilt/linux-arm64/bin/clang"
+
+  is not able to compile a simple test program.
+
+  It fails with the following output:
+
+    Change Dir: '/storage/emulated/0/AndroidIDEProjects/ProcTy/app/.cxx/Debug/5x143h4e/arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-KcafMJ'
+    
+    Run Build Command(s): /data/user/0/com.tom.rv2ide/files/home/android-sdk/cmake/4.1.2/bin/ninja -v cmTC_fd1f8
+    [1/2] /data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/27.3.13750724/toolchains/llvm/prebuilt/linux-arm64/bin/clang --target=aarch64-none-linux-android29 --sysroot=/data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/27.3.13750724/toolchains/llvm/prebuilt/linux-arm64/sysroot   -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security   -fPIE -MD -MT CMakeFiles/cmTC_fd1f8.dir/testCCompiler.c.o -MF CMakeFiles/cmTC_fd1f8.dir/testCCompiler.c.o.d -o CMakeFiles/cmTC_fd1f8.dir/testCCompiler.c.o -c /storage/emulated/0/AndroidIDEProjects/ProcTy/app/.cxx/Debug/5x143h4e/arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-KcafMJ/testCCompiler.c
+    [2/2] : && /data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/27.3.13750724/toolchains/llvm/prebuilt/linux-arm64/bin/clang --target=aarch64-none-linux-android29 --sysroot=/data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/27.3.13750724/toolchains/llvm/prebuilt/linux-arm64/sysroot -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security -static-libstdc++ -Wl,--build-id=sha1 -Wl,--no-rosegment -Wl,--no-undefined-version -Wl,--fatal-warnings -Wl,--no-undefined -Qunused-arguments CMakeFiles/cmTC_fd1f8.dir/testCCompiler.c.o -o cmTC_fd1f8  -latomic -lm && :
+    FAILED: cmTC_fd1f8 
+    : && /data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/27.3.13750724/toolchains/llvm/prebuilt/linux-arm64/bin/clang --target=aarch64-none-linux-android29 --sysroot=/data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/27.3.13750724/toolchains/llvm/prebuilt/linux-arm64/sysroot -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security -static-libstdc++ -Wl,--build-id=sha1 -Wl,--no-rosegment -Wl,--no-undefined-version -Wl,--fatal-warnings -Wl,--no-undefined -Qunused-arguments CMakeFiles/cmTC_fd1f8.dir/testCCompiler.c.o -o cmTC_fd1f8  -latomic -lm && :
+    error: "/data/user/0/com.tom.rv2ide/files/home/android-sdk/ndk/27.3.13750724/toolchains/llvm/prebuilt/linux-arm64/bin/ld.lld": executable's TLS segment is underaligned: alignment is 8 (skew 0), needs to be at least 64 for ARM64 Bionic
+    clang: error: unable to execute command: Aborted
+    clang: error: linker command failed due to signal (use -v to see invocation)
+    ninja: build stopped: subcommand failed.
+    
+    
+
+
+
+  CMake will not be able to correctly generate this project.
+Call Stack (most recent call first):
+  CMakeLists.txt:2 (project)
+
+

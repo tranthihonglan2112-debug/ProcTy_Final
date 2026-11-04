@@ -1,0 +1,1 @@
+/data/user/0/com.tom.rv2ide/files/home/android-sdk/cmake/3.22.1/bin/cmake[1]: syntax error: unexpected ')'
