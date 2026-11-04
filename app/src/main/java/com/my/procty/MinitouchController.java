@@ -7,6 +7,7 @@ import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.Socket;
+import rikka.shizuku.Shizuku;
 
 public class MinitouchController {
     private static final String TAG = "ProcTy_Minitouch";
