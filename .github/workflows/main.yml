@@ -1,7 +1,9 @@
 name: Build ProcTy APK
 
 on:
-  workflow_dispatch:
+  push:
+    branches: [ "main", "master" ] # TỰ ĐỘNG BUILD KHI PUSH LÊN NHÁNH NÀY
+  workflow_dispatch: # Vẫn giữ nút bấm thủ công cho chắc
 
 jobs:
   build:
@@ -9,17 +11,22 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+    
     - name: Set up JDK 17
       uses: actions/setup-java@v4
       with:
         distribution: 'temurin'
         java-version: '17'
+        
     - name: Setup Android SDK
       uses: android-actions/setup-android@v4
+      
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
+      
     - name: Build Debug APK
       run: ./gradlew assembleDebug
+      
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
