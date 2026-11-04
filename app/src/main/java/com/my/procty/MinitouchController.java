@@ -6,8 +6,8 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.lang.reflect.Method;
 import java.net.Socket;
-import rikka.shizuku.Shizuku;
 
 public class MinitouchController {
     private static final String TAG = "ProcTy_Minitouch";
@@ -15,53 +15,58 @@ public class MinitouchController {
     private static OutputStream outputStream = null;
     private static Process process = null;
 
-    public static void init(Context context) {
-        try {
-            // 1. Giải nén file minitouch từ assets ra bộ nhớ tạm
-            File minitouchFile = new File(context.getFilesDir(), "minitouch");
-            if (!minitouchFile.exists()) {
-                InputStream is = context.getAssets().open("minitouch");
-                FileOutputStream fos = new FileOutputStream(minitouchFile);
-                byte[] buffer = new byte[1024];
-                int length;
-                while ((length = is.read(buffer)) > 0) {
-                    fos.write(buffer, 0, length);
+    public static void init(final Context context) {
+        // CHẠY TRÊN LUỒNG RIÊNG ĐỂ TRÁNH CHẶN MAIN THREAD
+        new Thread(() -> {
+            try {
+                // 1. Giải nén file minitouch từ assets
+                File minitouchFile = new File(context.getFilesDir(), "minitouch");
+                if (!minitouchFile.exists()) {
+                    InputStream is = context.getAssets().open("minitouch");
+                    FileOutputStream fos = new FileOutputStream(minitouchFile);
+                    byte[] buffer = new byte[1024];
+                    int length;
+                    while ((length = is.read(buffer)) > 0) {
+                        fos.write(buffer, 0, length);
+                    }
+                    fos.close();
+                    is.close();
                 }
-                fos.close();
-                is.close();
+
+                // 2. Dùng Reflection gọi Shizuku.newProcess (Hàm này bị ẩn từ API 13.x)
+                Class<?> shizukuClass = Class.forName("rikka.shizuku.Shizuku");
+                Method newProcessMethod = shizukuClass.getDeclaredMethod("newProcess", String[].class, String[].class, String.class);
+                newProcessMethod.setAccessible(true);
+
+                // 3. Chạy lệnh chmod +x
+                String chmodCmd = "chmod 755 " + minitouchFile.getAbsolutePath();
+                Process chmodProcess = (Process) newProcessMethod.invoke(null, new String[]{"sh", "-c", chmodCmd}, null, null);
+                if (chmodProcess != null) chmodProcess.waitFor();
+
+                // 4. Khởi chạy Minitouch ngầm
+                String startCmd = minitouchFile.getAbsolutePath() + " -i 127.0.0.1";
+                process = (Process) newProcessMethod.invoke(null, new String[]{"sh", "-c", startCmd}, null, null);
+                
+                // 5. Đợi 1 chút rồi kết nối Socket tới cổng 1111
+                Thread.sleep(1000); 
+                socket = new Socket("127.0.0.1", 1111);
+                outputStream = socket.getOutputStream();
+
+                Log.i(TAG, "Minitouch đã sẵn sàng!");
+            } catch (Exception e) {
+                Log.e(TAG, "Lỗi khởi tạo Minitouch: " + e.getMessage());
+                close();
             }
-
-            // 2. Dùng Shizuku để cấp quyền chạy file (chmod +x)
-            // Lưu ý: Vì mình không dùng Root, phải dùng Shizuku để chmod và exec
-            String shizukuCmd = "chmod 755 " + minitouchFile.getAbsolutePath();
-            Process shizukuProcess = Shizuku.newProcess(new String[]{"sh", "-c", shizukuCmd}, null, null);
-            shizukuProcess.waitFor();
-
-            // 3. Khởi chạy Minitouch thông qua STFService (Mặc định cổng 1111)
-            String startCmd = minitouchFile.getAbsolutePath() + " -i 127.0.0.1";
-            process = Shizuku.newProcess(new String[]{"sh", "-c", startCmd}, null, null);
-            
-            // 4. Kết nối Socket tới Minitouch (Đợi 1 chút để nó khởi động)
-            Thread.sleep(1000); 
-            socket = new Socket("127.0.0.1", 1111);
-            outputStream = socket.getOutputStream();
-
-            Log.i(TAG, "Minitouch đã sẵn sàng!");
-        } catch (Exception e) {
-            Log.e(TAG, "Lỗi khởi tạo Minitouch: " + e.getMessage());
-            close();
-        }
+        }).start();
     }
 
-    // Hàm gửi lệnh vuốt cho Minitouch
     public static void swipe(int startX, int startY, int endX, int endY, int durationMs) {
         if (outputStream == null) return;
         try {
-            // Cú pháp Minitouch: d (down), m (move), u (up), c (commit)
-            String cmd = "d 0 " + startX + " " + startY + " 50\n" + // Chạm xuống
-                         "m 0 " + endX + " " + endY + " 50\n" +   // Di chuyển
-                         "u 0\n" +                                 // Nhấc lên
-                         "c\n";                                    // Thực thi
+            String cmd = "d 0 " + startX + " " + startY + " 50\n" +
+                         "m 0 " + endX + " " + endY + " 50\n" +
+                         "u 0\n" +
+                         "c\n";
             outputStream.write(cmd.getBytes());
             outputStream.flush();
         } catch (Exception e) {
@@ -76,4 +81,4 @@ public class MinitouchController {
         outputStream = null;
         process = null;
     }
-}
+    }
