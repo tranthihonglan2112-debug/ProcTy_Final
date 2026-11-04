@@ -12,7 +12,7 @@ Java_com_my_procty_FloatingService_nativeFindTarget(JNIEnv *env, jobject thiz, j
     if (pixels == nullptr || capacity <= 0) return 0;
 
     // TỰ ĐỘNG LẤY TÂM MÀN HÌNH
-    int centerX = width / 2;
+    int centerX = (width / 2) - 30;
     int centerY = height / 2;
 
     // ================== MODE 1: LỌC MÀU ==================

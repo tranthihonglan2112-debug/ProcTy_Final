@@ -32,10 +32,16 @@
             </intent-filter>
         </activity>
 
+        <!-- Khai báo Service chụp màn hình -->
         <service
             android:name=".FloatingService"
             android:exported="false"
             android:foregroundServiceType="mediaProjection" />
+
+        <!-- KHAI BÁO THÊM SERVICE MENU (MỚI) -->
+        <service
+            android:name=".FloatingMenuService"
+            android:exported="false" />
 
         <provider
             android:name="rikka.shizuku.ShizukuProvider"
