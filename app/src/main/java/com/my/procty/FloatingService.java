@@ -46,7 +46,7 @@ public class FloatingService extends Service {
 
     private static final boolean REQUIRE_LANDSCAPE = true;
     
-    // Giảm khoảng nghỉ vì Minitouch phản hồi nhanh
+    // Giảm khoản nghỉ vì Minitouch phản hồi nhanh
     private static final long MIN_SWIPE_INTERVAL_MS = 50; 
 
     private static boolean crashHandlerInstalled = false;
