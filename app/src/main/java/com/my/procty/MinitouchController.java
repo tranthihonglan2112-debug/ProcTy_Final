@@ -184,7 +184,9 @@ public class MinitouchController {
         try {
             p.exitValue();
             return false;
-        } catch (IllegalThreadStateException e) {
+        } catch (IllegalArgumentException e) {
+            // Shizuku ném IllegalArgumentException nếu process CHƯA chết
+            // (IllegalThreadStateException là lớp con nên cũng được bắt ở đây)
             return true;
         }
     }
@@ -264,4 +266,4 @@ public class MinitouchController {
         }
         if (p != null) p.destroy();
     }
-}
+                }
