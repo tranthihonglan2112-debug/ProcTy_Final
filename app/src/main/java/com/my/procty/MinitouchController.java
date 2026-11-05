@@ -37,13 +37,13 @@ public class MinitouchController {
                 newProcessMethod.setAccessible(true);
 
                 // Copy file
-                String copyCmd = "cp " + dexFile.getAbsolutePath() + " /data/local/tmp/maatouch.dex";
+                String copyCmd = "cp " + dexFile.getAbsolutePath() + " /data/local/tmp/maatouch.dex && chmod 644 /data/local/tmp/maatouch.dex";
                 Process copyProcess = (Process) newProcessMethod.invoke(null, new String[]{"sh", "-c", copyCmd}, null, null);
                 if (copyProcess != null) copyProcess.waitFor();
                 Log.d(TAG, "Đã copy maatouch.dex vào /data/local/tmp/");
 
                 // Khởi chạy Server
-                String startCmd = "export CLASSPATH=/data/local/tmp/maatouch.dex; app_process /data/local/tmp com.shxyke.MaaTouch.App";
+                String startCmd = "export CLASSPATH=/data/local/tmp/maatouch.dex; app_process /data/local/tmp com.shxyke.MaaTouch.App > /dev/null 2>&1 &";
                 newProcessMethod.invoke(null, new String[]{"sh", "-c", startCmd}, null, null);
                 
                 // 3. Đợi 2 giây cho Server khởi động
@@ -95,4 +95,4 @@ public class MinitouchController {
         socket = null;
         outputStream = null;
     }
-    }
+                    }
