@@ -325,7 +325,8 @@ public class FloatingService extends Service {
                 if (now - lastSwipeUptime >= MIN_SWIPE_INTERVAL_MS) {
                     lastSwipeUptime = now;
                     // GỌI MINITOUCH THAY VÌ INPUTINJECTOR
-                    MinitouchController.swipe(imgW / 2, imgH / 2, targetX, targetY, 10);
+                    
+MinitouchController.swipe(1299, 360, targetX, targetY, 10);
                 }
             }
         } catch (Exception e) {
