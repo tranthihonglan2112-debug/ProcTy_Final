@@ -43,7 +43,7 @@ public class MinitouchController {
                 Log.d(TAG, "Đã copy maatouch.dex vào /data/local/tmp/");
 
                 // Khởi chạy Server
-                String startCmd = "export CLASSPATH=/data/local/tmp/maatouch.dex; app_process /data/local/tmp com.shxyke.MaaTouch.App > /dev/null 2>&1 &";
+                String startCmd = "~/rish -c 'export CLASSPATH=/data/local/tmp/maatouch.dex; nohup app_process /data/local/tmp com.shxyke.MaaTouch.App > /dev/null 2>&1 &'";
                 newProcessMethod.invoke(null, new String[]{"sh", "-c", startCmd}, null, null);
                 
                 // 3. Đợi 2 giây cho Server khởi động
