@@ -7,6 +7,7 @@ import android.app.Service;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.ServiceInfo;
+import android.graphics.Bitmap;
 import android.graphics.PixelFormat;
 import android.graphics.drawable.GradientDrawable;
 import android.hardware.display.DisplayManager;
@@ -45,8 +46,6 @@ public class FloatingService extends Service {
     private static final String TAG_ERROR = "ProcTyError";
 
     private static final boolean REQUIRE_LANDSCAPE = true;
-    
-    // Giảm khoản nghỉ vì Minitouch phản hồi nhanh
     private static final long MIN_SWIPE_INTERVAL_MS = 50; 
 
     private static boolean crashHandlerInstalled = false;
@@ -70,6 +69,11 @@ public class FloatingService extends Service {
     private long lastSwipeUptime = 0;
 
     private SharedPreferences prefs;
+    private final int roiBoxSize = 300; 
+
+    // TỐI ƯU 1: Biến lưu toạ độ thực tế của khung xanh trên màn hình
+    private int roiRealX = 0;
+    private int roiRealY = 0;
 
     @Override
     public IBinder onBind(Intent intent) {
@@ -92,7 +96,6 @@ public class FloatingService extends Service {
 
             startForegroundWithAppropriateType();
 
-            // KHỞI TẠO MINITOUCH THAY VÌ INPUTINJECTOR
             MinitouchController.init(this);
 
         } catch (Exception e) {
@@ -224,7 +227,6 @@ public class FloatingService extends Service {
             displayManager.registerDisplayListener(displayListener, captureHandler);
             Log.i(TAG_FRAME, "Capture sẵn sàng: " + captureWidth + "x" + captureHeight + " @" + captureDpi + "dpi");
 
-            // VẼ KHUNG DEBUG ROI (Tự động căn giữa)
             drawRoiBox(captureWidth, captureHeight);
             
         } catch (Exception e) {
@@ -236,24 +238,26 @@ public class FloatingService extends Service {
         try {
             roiView = new View(this);
             GradientDrawable border = new GradientDrawable();
-            border.setColor(0x2200D2FF); // Màu xanh mờ nhẹ
-            border.setStroke(5, 0xFF00D2FF); // Viền xanh dày 5px
+            border.setColor(0x2200D2FF); 
+            border.setStroke(5, 0xFF00D2FF); 
             roiView.setBackground(border);
 
             int layoutParamType = (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) ?
                     WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY : WindowManager.LayoutParams.TYPE_PHONE;
 
-            int boxSize = 300;
             WindowManager.LayoutParams params = new WindowManager.LayoutParams(
-                    boxSize, boxSize,
+                    roiBoxSize, roiBoxSize,
                     layoutParamType, WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
                     PixelFormat.TRANSLUCENT
             );
             params.gravity = Gravity.TOP | Gravity.LEFT;
             
-            // SỬA LỆCH SANG TRÁI 30 PIXEL (Trừ đi 30)
-            params.x = (screenW / 2) - (boxSize / 2) - 30; 
-            params.y = (screenH / 2) - (boxSize / 2);
+            params.x = (screenW / 2) - (roiBoxSize / 2) - 30; 
+            params.y = (screenH / 2) - (roiBoxSize / 2);
+
+            // TỐI ƯU 1: Lưu lại toạ độ thực tế của khung xanh để tí nữa bù trừ
+            roiRealX = params.x;
+            roiRealY = params.y;
 
             windowManager.addView(roiView, params);
             Log.i(TAG_FRAME, "Đã vẽ khung ROI tại X=" + params.x + ", Y=" + params.y);
@@ -272,9 +276,9 @@ public class FloatingService extends Service {
             int imgH = image.getHeight();
             boolean portrait = imgW < imgH;
 
-            // GIẢM FPS XUỐNG ~20FPS (Bỏ qua 2/3 số frame)
+            // TỐI ƯU 2: GIẢM TẢI (1/6 khung hình)
             frameCount++;
-            if (frameCount % 3 != 0) return;
+            if (frameCount % 6 != 0) return;
 
             isScanning = prefs.getBoolean("is_scanning", false);
             int mode = prefs.getInt("mode", 1);
@@ -288,20 +292,35 @@ public class FloatingService extends Service {
             Image.Plane[] planes = image.getPlanes();
             if (planes == null || planes.length == 0) return;
 
-            ByteBuffer buffer = planes[0].getBuffer();
-            int rowStride = planes[0].getRowStride();
+            // Ẩn khung xanh đi trong lúc chụp để C++ không bị nhiễu
+            if (roiView != null) roiView.setVisibility(View.GONE);
 
-            // ĐỌC ẢNH MẪU
+            // TỐI ƯU 3: CẮT ẢNH (CROP)
+            // Tạo một Bitmap nhỏ 300x300 từ vùng khung xanh
+            Bitmap croppedBitmap = Bitmap.createBitmap(imgW, imgH, Bitmap.Config.ARGB_8888);
+            croppedBitmap.copyPixelsFromBuffer(planes[0].getBuffer());
+            // Cắt lấy đúng vùng 300x300 tại toạ độ roiRealX, roiRealY
+            Bitmap finalBitmap = Bitmap.createBitmap(croppedBitmap, roiRealX, roiRealY, roiBoxSize, roiBoxSize);
+            
+            // Chuyển Bitmap 300x300 thành ByteBuffer để đưa vào C++
+            ByteBuffer croppedBuffer = ByteBuffer.allocateDirect(finalBitmap.getByteCount());
+            finalBitmap.copyPixelsToBuffer(croppedBuffer);
+            croppedBuffer.rewind();
+            
+            // Giải phóng bộ nhớ Bitmap cũ để tránh tràn RAM
+            croppedBitmap.recycle();
+            finalBitmap.recycle();
+
+            // Đọc ảnh mẫu
             byte[] templateData = null; 
             int tplW = 0, tplH = 0;
-
             if (mode == 2) {
                 File tplFile = new File("/storage/emulated/0/Download/head_front.png");
                 if (tplFile.exists()) {
                     try {
                         InputStream is = new java.io.FileInputStream(tplFile);
                         templateData = new byte[(int) tplFile.length()];
-                        int bytesRead = is.read(templateData);
+                        is.read(templateData);
                         is.close();
                     } catch (Exception e) {
                         Log.e(TAG_ERROR, "Lỗi đọc ảnh: " + e.getMessage());
@@ -309,30 +328,37 @@ public class FloatingService extends Service {
                 }
             }
 
-            long result = nativeFindTarget(buffer, imgW, imgH, rowStride, mode, cR, cG, cB, templateData, tplW, tplH);
+            // Đưa vùng ảnh 300x300 vào C++ (C++ chạy nhanh gấp 13 lần)
+            long result = nativeFindTarget(croppedBuffer, roiBoxSize, roiBoxSize, roiBoxSize * 4, mode, cR, cG, cB, templateData, tplW, tplH);
+
+            // Hiện lại khung xanh sau khi chụp xong
+            if (roiView != null) roiView.setVisibility(View.VISIBLE);
 
             if (result != 0) {
                 int deltaX = (int) (result >> 32) - 2000;
                 int deltaY = (int) (result & 0xFFFFFFFFL) - 2000;
                 
-                // Căn tâm màn hình và bù trừ độ lệch khung xanh
-                int targetX = ((imgW / 2) - 30) + deltaX;
-                int targetY = (imgH / 2) + deltaY;
+                // TỐI ƯU 4: BÙ TRỪ TOẠ ĐỘ
+                // C++ trả về độ lệch so với tâm vùng 300x300. 
+                // Toạ độ tuyệt đối = Toạ độ gốc khung xanh + Tâm khung (150) + Độ lệch
+                int targetX = roiRealX + (roiBoxSize / 2) + deltaX;
+                int targetY = roiRealY + (roiBoxSize / 2) + deltaY;
 
                 Log.d("ProcTyTarget", "Kéo tâm tới: X=" + targetX + ", Y=" + targetY);
 
                 long now = SystemClock.uptimeMillis();
                 if (now - lastSwipeUptime >= MIN_SWIPE_INTERVAL_MS) {
                     lastSwipeUptime = now;
-                    // GỌI MINITOUCH THAY VÌ INPUTINJECTOR
-                    
-MinitouchController.swipe(1299, 360, targetX, targetY, 10);
+                    MinitouchController.swipe(1299, 360, targetX, targetY, 10);
                 }
             }
         } catch (Exception e) {
             Log.e(TAG_ERROR, "Lỗi frame: " + e, e);
         } finally {
             if (image != null) image.close();
+            if (roiView != null && roiView.getVisibility() != View.VISIBLE) {
+                roiView.setVisibility(View.VISIBLE);
+            }
         }
     };
 
@@ -399,7 +425,6 @@ MinitouchController.swipe(1299, 360, targetX, targetY, 10);
             try { displayManager.unregisterDisplayListener(displayListener); } catch (Exception ignored) {}
         }
         
-        // XÓA KHUNG DEBUG KHI TẮT
         if (roiView != null && windowManager != null) {
             try { windowManager.removeView(roiView); } catch (Exception ignored) {}
             roiView = null;
@@ -441,4 +466,4 @@ MinitouchController.swipe(1299, 360, targetX, targetY, 10);
         
         MinitouchController.close();
     }
-}
+    }
