@@ -7,7 +7,6 @@ import android.app.Service;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.ServiceInfo;
-import android.graphics.Bitmap;
 import android.graphics.PixelFormat;
 import android.graphics.drawable.GradientDrawable;
 import android.hardware.display.DisplayManager;
@@ -71,7 +70,7 @@ public class FloatingService extends Service {
     private SharedPreferences prefs;
     private final int roiBoxSize = 300; 
 
-    // TỐI ƯU 1: Biến lưu toạ độ thực tế của khung xanh trên màn hình
+    // Biến lưu toạ độ thực tế của khung xanh trên màn hình
     private int roiRealX = 0;
     private int roiRealY = 0;
 
@@ -238,7 +237,8 @@ public class FloatingService extends Service {
         try {
             roiView = new View(this);
             GradientDrawable border = new GradientDrawable();
-            border.setColor(0x2200D2FF); 
+            // TỐI ƯU: Xóa nền xanh mờ, chỉ giữ viền đậm để không ảnh hưởng C++
+            border.setColor(0x00000000); 
             border.setStroke(5, 0xFF00D2FF); 
             roiView.setBackground(border);
 
@@ -255,7 +255,6 @@ public class FloatingService extends Service {
             params.x = (screenW / 2) - (roiBoxSize / 2) - 30; 
             params.y = (screenH / 2) - (roiBoxSize / 2);
 
-            // TỐI ƯU 1: Lưu lại toạ độ thực tế của khung xanh để tí nữa bù trừ
             roiRealX = params.x;
             roiRealY = params.y;
 
@@ -276,7 +275,7 @@ public class FloatingService extends Service {
             int imgH = image.getHeight();
             boolean portrait = imgW < imgH;
 
-            // TỐI ƯU 2: GIẢM TẢI (1/6 khung hình)
+            // TỐI ƯU: GIẢM TẢI (1/6 khung hình)
             frameCount++;
             if (frameCount % 6 != 0) return;
 
@@ -292,25 +291,17 @@ public class FloatingService extends Service {
             Image.Plane[] planes = image.getPlanes();
             if (planes == null || planes.length == 0) return;
 
-            // Ẩn khung xanh đi trong lúc chụp để C++ không bị nhiễu
-            if (roiView != null) roiView.setVisibility(View.GONE);
+            ByteBuffer buffer = planes[0].getBuffer();
+            int rowStride = planes[0].getRowStride();
 
-            // TỐI ƯU 3: CẮT ẢNH (CROP)
-            // Tạo một Bitmap nhỏ 300x300 từ vùng khung xanh
-            Bitmap croppedBitmap = Bitmap.createBitmap(imgW, imgH, Bitmap.Config.ARGB_8888);
-            croppedBitmap.copyPixelsFromBuffer(planes[0].getBuffer());
-            // Cắt lấy đúng vùng 300x300 tại toạ độ roiRealX, roiRealY
-            Bitmap finalBitmap = Bitmap.createBitmap(croppedBitmap, roiRealX, roiRealY, roiBoxSize, roiBoxSize);
-            
-            // Chuyển Bitmap 300x300 thành ByteBuffer để đưa vào C++
-            ByteBuffer croppedBuffer = ByteBuffer.allocateDirect(finalBitmap.getByteCount());
-            finalBitmap.copyPixelsToBuffer(croppedBuffer);
-            croppedBuffer.rewind();
-            
-            // Giải phóng bộ nhớ Bitmap cũ để tránh tràn RAM
-            croppedBitmap.recycle();
-            finalBitmap.recycle();
+            // TỐI ƯU: CẮT ẢNH (CROP) TRỰC TIẾP TRÊN BUFFER (Không dùng Bitmap, không gây crash)
+            int pixelSize = 4; // ARGB_8888
+            // Lùi vào trong 5 pixel để né viền xanh
+            int startOffset = ((roiRealY + 5) * rowStride) + ((roiRealX + 5) * pixelSize);
+            int newRowStride = (roiBoxSize - 10) * pixelSize; 
 
+            buffer.position(startOffset);
+            
             // Đọc ảnh mẫu
             byte[] templateData = null; 
             int tplW = 0, tplH = 0;
@@ -328,19 +319,14 @@ public class FloatingService extends Service {
                 }
             }
 
-            // Đưa vùng ảnh 300x300 vào C++ (C++ chạy nhanh gấp 13 lần)
-            long result = nativeFindTarget(croppedBuffer, roiBoxSize, roiBoxSize, roiBoxSize * 4, mode, cR, cG, cB, templateData, tplW, tplH);
-
-            // Hiện lại khung xanh sau khi chụp xong
-            if (roiView != null) roiView.setVisibility(View.VISIBLE);
+            // Đưa vùng ảnh (đã cắt) vào C++
+            long result = nativeFindTarget(buffer, roiBoxSize - 10, roiBoxSize - 10, newRowStride, mode, cR, cG, cB, templateData, tplW, tplH);
 
             if (result != 0) {
                 int deltaX = (int) (result >> 32) - 2000;
                 int deltaY = (int) (result & 0xFFFFFFFFL) - 2000;
                 
-                // TỐI ƯU 4: BÙ TRỪ TOẠ ĐỘ
-                // C++ trả về độ lệch so với tâm vùng 300x300. 
-                // Toạ độ tuyệt đối = Toạ độ gốc khung xanh + Tâm khung (150) + Độ lệch
+                // BÙ TRỪ TOẠ ĐỘ
                 int targetX = roiRealX + (roiBoxSize / 2) + deltaX;
                 int targetY = roiRealY + (roiBoxSize / 2) + deltaY;
 
@@ -356,9 +342,6 @@ public class FloatingService extends Service {
             Log.e(TAG_ERROR, "Lỗi frame: " + e, e);
         } finally {
             if (image != null) image.close();
-            if (roiView != null && roiView.getVisibility() != View.VISIBLE) {
-                roiView.setVisibility(View.VISIBLE);
-            }
         }
     };
 
