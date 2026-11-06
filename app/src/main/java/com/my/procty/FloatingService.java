@@ -37,9 +37,10 @@ public class FloatingService extends Service {
         System.loadLibrary("procty");
     }
 
+    // SỬA ĐỔI: Tách riêng hàm nạp ảnh mẫu và hàm tìm kiếm
+    private native void nativeLoadTemplate(byte[] templateData);
     private native long nativeFindTarget(ByteBuffer buffer, int width, int height, int rowStride,
-                                         int mode, int cR, int cG, int cB,
-                                         byte[] templateData, int tplWidth, int tplHeight);
+                                         int mode, int cR, int cG, int cB);
 
     private static final String TAG_FRAME = "ProcTyFrame";
     private static final String TAG_ERROR = "ProcTyError";
@@ -70,9 +71,12 @@ public class FloatingService extends Service {
     private SharedPreferences prefs;
     private final int roiBoxSize = 300; 
 
-    // Biến lưu toạ độ thực tế của khung xanh trên màn hình
     private int roiRealX = 0;
     private int roiRealY = 0;
+
+    // TỐI ƯU: Lưu ảnh mẫu vào bộ nhớ 1 lần
+    private byte[] cachedTemplateData = null;
+    private int lastLoadedMode = -1;
 
     @Override
     public IBinder onBind(Intent intent) {
@@ -237,7 +241,6 @@ public class FloatingService extends Service {
         try {
             roiView = new View(this);
             GradientDrawable border = new GradientDrawable();
-            // TỐI ƯU: Xóa nền xanh mờ, chỉ giữ viền đậm để không ảnh hưởng C++
             border.setColor(0x00000000); 
             border.setStroke(5, 0xFF00D2FF); 
             roiView.setBackground(border);
@@ -275,7 +278,6 @@ public class FloatingService extends Service {
             int imgH = image.getHeight();
             boolean portrait = imgW < imgH;
 
-            // TỐI ƯU: GIẢM TẢI (1/6 khung hình)
             frameCount++;
             if (frameCount % 6 != 0) return;
 
@@ -294,39 +296,49 @@ public class FloatingService extends Service {
             ByteBuffer buffer = planes[0].getBuffer();
             int rowStride = planes[0].getRowStride();
 
-            // TỐI ƯU: CẮT ẢNH (CROP) TRỰC TIẾP TRÊN BUFFER (Không dùng Bitmap, không gây crash)
-            int pixelSize = 4; // ARGB_8888
-            // Lùi vào trong 5 pixel để né viền xanh
+            int pixelSize = 4; 
             int startOffset = ((roiRealY + 5) * rowStride) + ((roiRealX + 5) * pixelSize);
             int newRowStride = (roiBoxSize - 10) * pixelSize; 
 
             buffer.position(startOffset);
-            
-            // Đọc ảnh mẫu
-            byte[] templateData = null; 
-            int tplW = 0, tplH = 0;
+
+            // TỐI ƯU: NẠP ẢNH MẪU 1 LẦN DUY NHẤT
             if (mode == 2) {
-                File tplFile = new File("/storage/emulated/0/Download/head_front.png");
-                if (tplFile.exists()) {
-                    try {
-                        InputStream is = new java.io.FileInputStream(tplFile);
-                        templateData = new byte[(int) tplFile.length()];
-                        is.read(templateData);
-                        is.close();
-                    } catch (Exception e) {
-                        Log.e(TAG_ERROR, "Lỗi đọc ảnh: " + e.getMessage());
+                // Nếu vừa đổi sang mode 2, hoặc chưa có ảnh mẫu -> Nạp 1 lần
+                if (lastLoadedMode != 2 || cachedTemplateData == null) {
+                    File tplFile = new File("/storage/emulated/0/Download/head_front.png");
+                    if (tplFile.exists()) {
+                        try {
+                            InputStream is = new java.io.FileInputStream(tplFile);
+                            cachedTemplateData = new byte[(int) tplFile.length()];
+                            is.read(cachedTemplateData);
+                            is.close();
+                            
+                            // Gửi sang C++ giải mã 1 lần
+                            nativeLoadTemplate(cachedTemplateData);
+                            lastLoadedMode = 2;
+                            Log.d(TAG_FRAME, "Đã nạp ảnh mẫu 1 lần thành công!");
+                        } catch (Exception e) {
+                            Log.e(TAG_ERROR, "Lỗi đọc ảnh mẫu: " + e.getMessage());
+                        }
+                    } else {
+                        Log.e(TAG_ERROR, "Không tìm thấy file ảnh mẫu!");
                     }
+                }
+            } else {
+                if (lastLoadedMode != 1) {
+                    nativeLoadTemplate(null); // Xóa ảnh mẫu trong C++ nếu chuyển về mode màu
+                    lastLoadedMode = 1;
                 }
             }
 
-            // Đưa vùng ảnh (đã cắt) vào C++
-            long result = nativeFindTarget(buffer, roiBoxSize - 10, roiBoxSize - 10, newRowStride, mode, cR, cG, cB, templateData, tplW, tplH);
+            // Chỉ cần truyền buffer vào, C++ đã có sẵn ảnh mẫu trong bộ nhớ
+            long result = nativeFindTarget(buffer, roiBoxSize - 10, roiBoxSize - 10, newRowStride, mode, cR, cG, cB);
 
             if (result != 0) {
                 int deltaX = (int) (result >> 32) - 2000;
                 int deltaY = (int) (result & 0xFFFFFFFFL) - 2000;
                 
-                // BÙ TRỪ TOẠ ĐỘ
                 int targetX = roiRealX + (roiBoxSize / 2) + deltaX;
                 int targetY = roiRealY + (roiBoxSize / 2) + deltaY;
 
