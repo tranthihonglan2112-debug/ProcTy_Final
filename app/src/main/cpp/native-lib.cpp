@@ -28,7 +28,7 @@ static const double DOWNSCALE = 0.5;       // hệ số thu nhỏ khi so khớp
 
 // ĐÃ NÂNG từ 0.65 lên 0.78: khi có mask, nền game không có mục tiêu vẫn có thể đạt ~0.70,
 // còn mục tiêu thật thường >= 0.85 (số liệu từ mô phỏng). Hãy chỉnh lại theo log "mode2: best=..." trên máy thật.
-static const double MATCH_THRESHOLD = 0.78;
+static const double MATCH_THRESHOLD = 0.65;
 
 // TM_CCOEFF_NORMED có mask. Nếu bản OpenCV của bạn báo lỗi ở dòng log "matchTemplate lỗi",
 // đổi sang cv::TM_CCORR_NORMED (điểm cao hơn hẳn, cần nâng ngưỡng thêm).
