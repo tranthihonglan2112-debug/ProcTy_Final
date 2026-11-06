@@ -266,4 +266,4 @@ public class MinitouchController {
         }
         if (p != null) p.destroy();
     }
-                                             }
+}

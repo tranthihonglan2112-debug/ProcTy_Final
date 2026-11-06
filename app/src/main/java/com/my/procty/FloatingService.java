@@ -38,8 +38,10 @@ public class FloatingService extends Service {
     }
 
     // SỬA ĐỔI: Tách riêng hàm nạp ảnh mẫu và hàm tìm kiếm
-    private native void nativeLoadTemplate(byte[] templateData);
-    private native long nativeFindTarget(ByteBuffer buffer, int width, int height, int rowStride,
+    private native boolean nativeLoadTemplate(byte[] templateData);
+    // buffer = TOÀN BỘ khung hình; (roiX,roiY,roiW,roiH) = vùng quét. Cắt ROI ở C++ bằng cv::Mat(stride thật).
+    private native long nativeFindTarget(ByteBuffer buffer, int fullW, int fullH, int rowStride,
+                                         int roiX, int roiY, int roiW, int roiH,
                                          int mode, int cR, int cG, int cB);
 
     private static final String TAG_FRAME = "ProcTyFrame";
@@ -296,11 +298,19 @@ public class FloatingService extends Service {
             ByteBuffer buffer = planes[0].getBuffer();
             int rowStride = planes[0].getRowStride();
 
-            int pixelSize = 4; 
-            int startOffset = ((roiRealY + 5) * rowStride) + ((roiRealX + 5) * pixelSize);
-            int newRowStride = (roiBoxSize - 10) * pixelSize; 
-
-            buffer.position(startOffset);
+            // ROI thật (lùi 5px để né viền xanh).
+            // KHÔNG dùng buffer.position(): JNI GetDirectBufferAddress luôn trả địa chỉ GỐC của buffer,
+            // nên C++ sẽ đọc từ góc trên-trái màn hình chứ không phải từ ROI. Truyền toạ độ ROI sang C++.
+            final int roiInset = 5;
+            final int roiX = roiRealX + roiInset;
+            final int roiY = roiRealY + roiInset;
+            final int roiW = roiBoxSize - 2 * roiInset;
+            final int roiH = roiBoxSize - 2 * roiInset;
+            if (roiX < 0 || roiY < 0 || roiX + roiW > imgW || roiY + roiH > imgH) {
+                Log.e(TAG_ERROR, "ROI nằm ngoài khung hình: roi=(" + roiX + "," + roiY + " " + roiW + "x" + roiH
+                        + ") khung=" + imgW + "x" + imgH);
+                return;
+            }
 
             // TỐI ƯU: NẠP ẢNH MẪU 1 LẦN DUY NHẤT
             if (mode == 2) {
@@ -309,15 +319,14 @@ public class FloatingService extends Service {
                     File tplFile = new File("/storage/emulated/0/Download/head_front.png");
                     if (tplFile.exists()) {
                         try {
-                            InputStream is = new java.io.FileInputStream(tplFile);
-                            cachedTemplateData = new byte[(int) tplFile.length()];
-                            is.read(cachedTemplateData);
-                            is.close();
-                            
-                            // Gửi sang C++ giải mã 1 lần
-                            nativeLoadTemplate(cachedTemplateData);
-                            lastLoadedMode = 2;
-                            Log.d(TAG_FRAME, "Đã nạp ảnh mẫu 1 lần thành công!");
+                            byte[] data = java.nio.file.Files.readAllBytes(tplFile.toPath()); // đọc ĐỦ file
+                            if (nativeLoadTemplate(data)) {   // giải mã 1 lần ở C++
+                                cachedTemplateData = data;
+                                lastLoadedMode = 2;
+                                Log.d(TAG_FRAME, "Đã nạp ảnh mẫu (" + data.length + " byte)");
+                            } else {
+                                Log.e(TAG_ERROR, "C++ KHÔNG giải mã được ảnh mẫu (" + data.length + " byte): " + tplFile);
+                            }
                         } catch (Exception e) {
                             Log.e(TAG_ERROR, "Lỗi đọc ảnh mẫu: " + e.getMessage());
                         }
@@ -333,7 +342,7 @@ public class FloatingService extends Service {
             }
 
             // Chỉ cần truyền buffer vào, C++ đã có sẵn ảnh mẫu trong bộ nhớ
-            long result = nativeFindTarget(buffer, roiBoxSize - 10, roiBoxSize - 10, newRowStride, mode, cR, cG, cB);
+            long result = nativeFindTarget(buffer, imgW, imgH, rowStride, roiX, roiY, roiW, roiH, mode, cR, cG, cB);
 
             if (result != 0) {
                 int deltaX = (int) (result >> 32) - 2000;
