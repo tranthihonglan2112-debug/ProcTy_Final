@@ -48,7 +48,7 @@ public class FloatingService extends Service {
     private static final String TAG_ERROR = "ProcTyError";
 
     private static final boolean REQUIRE_LANDSCAPE = true;
-    private static final long MIN_SWIPE_INTERVAL_MS = 50; 
+    private static final long MIN_SWIPE_INTERVAL_MS = 200; 
 
     private static boolean crashHandlerInstalled = false;
 
