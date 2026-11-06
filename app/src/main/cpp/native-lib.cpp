@@ -13,13 +13,29 @@
 // ---------------------------------------------------------------------------
 // ẢNH MẪU: giải mã 1 lần, thu phóng sẵn nhiều tỉ lệ, LƯU Ở NỬA ĐỘ PHÂN GIẢI
 // (khớp ở nửa độ phân giải nhanh hơn ~6 lần mà độ chính xác gần như không đổi)
+//
+// MỚI: nếu PNG có kênh alpha (nền đã xóa), alpha được dùng làm MASK khi matchTemplate,
+// nên vùng trong suốt KHÔNG còn bị tính là "màu đen" nữa.
 // ---------------------------------------------------------------------------
 static std::vector<cv::Mat> g_tpls;        // RGB, đã nhân sẵn DOWNSCALE
+static std::vector<cv::Mat> g_masks;       // CV_8UC1 (0/255) cùng kích thước g_tpls[i]; Mat rỗng = không dùng mask
 static std::vector<double> g_tplScales;    // tỉ lệ so với ảnh mẫu gốc (để log)
 static bool g_templateLoaded = false;
+static bool g_hasMask = false;
+static bool g_matchFailLogged = false;
 
 static const double DOWNSCALE = 0.5;       // hệ số thu nhỏ khi so khớp
-static const double MATCH_THRESHOLD = 0.65;
+
+// ĐÃ NÂNG từ 0.65 lên 0.78: khi có mask, nền game không có mục tiêu vẫn có thể đạt ~0.70,
+// còn mục tiêu thật thường >= 0.85 (số liệu từ mô phỏng). Hãy chỉnh lại theo log "mode2: best=..." trên máy thật.
+static const double MATCH_THRESHOLD = 0.78;
+
+// TM_CCOEFF_NORMED có mask. Nếu bản OpenCV của bạn báo lỗi ở dòng log "matchTemplate lỗi",
+// đổi sang cv::TM_CCORR_NORMED (điểm cao hơn hẳn, cần nâng ngưỡng thêm).
+static const int MATCH_METHOD = cv::TM_CCOEFF_NORMED;
+
+static const int ALPHA_THRESHOLD = 128;    // alpha > 128 coi là pixel của mục tiêu
+static const int MIN_MASK_PX = 20;         // scale nào còn ít pixel mask hơn mức này thì bỏ
 static const double SCALE_STEP = 1.12;     // bước tỉ lệ ~12%
 static const int SCALE_MIN_K = -6;         // 1.12^-6 ~ 0.51x
 static const int SCALE_MAX_K = 6;          // 1.12^6  ~ 1.97x (có đúng 1.0x ở k=0)
@@ -36,7 +52,10 @@ static inline jlong packDelta(int dx, int dy) {
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_my_procty_FloatingService_nativeLoadTemplate(JNIEnv *env, jobject /*thiz*/, jbyteArray templateData) {
     g_templateLoaded = false;
+    g_hasMask = false;
+    g_matchFailLogged = false;
     g_tpls.clear();
+    g_masks.clear();
     g_tplScales.clear();
 
     if (templateData == nullptr) {          // Java chủ động xoá ảnh mẫu (chuyển sang mode màu)
@@ -52,13 +71,35 @@ Java_com_my_procty_FloatingService_nativeLoadTemplate(JNIEnv *env, jobject /*thi
     std::vector<uchar> data(bytes, bytes + len);
     env->ReleaseByteArrayElements(templateData, bytes, JNI_ABORT);
 
-    cv::Mat bgr = cv::imdecode(data, cv::IMREAD_COLOR);
-    if (bgr.empty()) {
+    // Giải mã GIỮ NGUYÊN kênh alpha (trước đây IMREAD_COLOR vứt alpha -> nền trong suốt thành đen)
+    cv::Mat img = cv::imdecode(data, cv::IMREAD_UNCHANGED);
+    if (img.empty()) {
         LOGE("imdecode THẤT BẠI (len=%d byte) - file không phải PNG/JPG hợp lệ?", (int) len);
         return JNI_FALSE;
     }
+
+    cv::Mat bgr, alpha;
+    if (img.depth() == CV_8U && img.channels() == 4) {
+        cv::cvtColor(img, bgr, cv::COLOR_BGRA2BGR);
+        cv::extractChannel(img, alpha, 3);
+    } else {
+        // Không có alpha (JPG, PNG 3 kênh, ảnh xám, 16-bit...): giải mã như cũ, không dùng mask
+        bgr = cv::imdecode(data, cv::IMREAD_COLOR);
+        if (bgr.empty()) {
+            LOGE("imdecode IMREAD_COLOR THẤT BẠI (len=%d byte)", (int) len);
+            return JNI_FALSE;
+        }
+    }
+
     cv::Mat rgb;
     cv::cvtColor(bgr, rgb, cv::COLOR_BGR2RGB);   // màn hình là RGBA -> so khớp trên RGB
+
+    // Chỉ dùng mask khi ảnh thật sự có pixel trong suốt
+    bool useMask = false;
+    if (!alpha.empty()) {
+        cv::Mat transparent = alpha < 255;
+        useMask = cv::countNonZero(transparent) > 0;
+    }
 
     for (int k = SCALE_MIN_K; k <= SCALE_MAX_K; k++) {
         double s = std::pow(SCALE_STEP, k);
@@ -66,12 +107,24 @@ Java_com_my_procty_FloatingService_nativeLoadTemplate(JNIEnv *env, jobject /*thi
         cv::Mat t;
         cv::resize(rgb, t, cv::Size(), f, f, cv::INTER_AREA);
         if (t.cols < MIN_TPL_PX || t.rows < MIN_TPL_PX) continue;
+
+        cv::Mat m;                                    // rỗng nếu không dùng mask
+        if (useMask) {
+            cv::Mat a;
+            cv::resize(alpha, a, t.size(), 0, 0, cv::INTER_AREA);
+            cv::threshold(a, m, ALPHA_THRESHOLD, 255, cv::THRESH_BINARY);   // CV_8UC1: 0 hoặc 255
+            if (cv::countNonZero(m) < MIN_MASK_PX) continue;
+        }
+
         g_tpls.push_back(t);
+        g_masks.push_back(m);
         g_tplScales.push_back(s);
     }
 
+    g_hasMask = useMask;
     g_templateLoaded = !g_tpls.empty();
-    LOGD("Nạp ảnh mẫu %dx%d -> %d tỉ lệ (nửa độ phân giải)", rgb.cols, rgb.rows, (int) g_tpls.size());
+    LOGD("Nạp ảnh mẫu %dx%d -> %d tỉ lệ (nửa độ phân giải, mask alpha: %s)",
+         rgb.cols, rgb.rows, (int) g_tpls.size(), useMask ? "CÓ" : "KHÔNG");
     return g_templateLoaded ? JNI_TRUE : JNI_FALSE;
 }
 
@@ -132,7 +185,7 @@ Java_com_my_procty_FloatingService_nativeFindTarget(JNIEnv *env, jobject /*thiz*
         return 0;
     }
 
-    // ================== MODE 2: SO KHỚP ẢNH MẪU ==================
+    // ================== MODE 2: SO KHỚP ẢNH MẪU (có mask alpha) ==================
     if (mode == 2) {
         if (!g_templateLoaded || g_tpls.empty()) {
             if ((++g_logCounter % 30) == 0) LOGE("mode 2 nhưng CHƯA nạp được ảnh mẫu");
@@ -148,10 +201,29 @@ Java_com_my_procty_FloatingService_nativeFindTarget(JNIEnv *env, jobject /*thiz*
 
         for (size_t i = 0; i < g_tpls.size(); i++) {
             const cv::Mat &t = g_tpls[i];
+            const cv::Mat &mask = g_masks[i];
             if (t.cols >= small.cols || t.rows >= small.rows) continue;   // template to hơn ROI
 
             cv::Mat result;
-            cv::matchTemplate(small, t, result, cv::TM_CCOEFF_NORMED);
+            try {
+                if (mask.empty()) {
+                    cv::matchTemplate(small, t, result, MATCH_METHOD);
+                } else {
+                    cv::matchTemplate(small, t, result, MATCH_METHOD, mask);
+                }
+            } catch (const cv::Exception &e) {
+                // Không để exception C++ xuyên qua JNI (sẽ làm app crash)
+                if (!g_matchFailLogged) {
+                    g_matchFailLogged = true;
+                    LOGE("matchTemplate lỗi (mask=%s): %s", mask.empty() ? "không" : "có", e.what());
+                }
+                continue;
+            }
+
+            // Mask có thể sinh NaN/Inf ở vùng phẳng (chia cho 0): vá thành -1 để không thành "điểm cao giả"
+            cv::patchNaNs(result, -1.0);
+            result.setTo(-1.0, result > 1.01);
+
             double maxVal;
             cv::Point maxLoc;
             cv::minMaxLoc(result, nullptr, &maxVal, nullptr, &maxLoc);
@@ -166,7 +238,8 @@ Java_com_my_procty_FloatingService_nativeFindTarget(JNIEnv *env, jobject /*thiz*
 
         // Log điểm cao nhất (thưa) để biết "gần ngưỡng" hay "hoàn toàn không khớp"
         if ((++g_logCounter % 10) == 0) {
-            LOGD("mode2: best=%.3f scale=%.2f (ngưỡng %.2f)", bestVal, bestScale, MATCH_THRESHOLD);
+            LOGD("mode2: best=%.3f scale=%.2f (ngưỡng %.2f, mask=%s)",
+                 bestVal, bestScale, MATCH_THRESHOLD, g_hasMask ? "có" : "không");
         }
 
         if (bestVal >= MATCH_THRESHOLD) {
