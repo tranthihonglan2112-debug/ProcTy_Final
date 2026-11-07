@@ -24,7 +24,7 @@ static std::vector<cv::Mat> g_tplHist;
 static cv::Mat g_calib[2];                 
 
 static const double DOWNSCALE = 0.5;       
-static const double MATCH_THRESHOLD = 0.65;
+static const double MATCH_THRESHOLD = 0.7;
 
 static const int MATCH_METHOD = cv::TM_CCOEFF_NORMED;
 
@@ -34,7 +34,7 @@ static const double SCALE_STEP = 1.12;
 static const int SCALE_MIN_K = -8;         
 static const int SCALE_MAX_K = 5;          
 static const int MIN_TPL_PX = 8;           
-static const double COLOR_MIN_CORREL = 0.4;
+static const double COLOR_MIN_CORREL = 0.5;
 
 // MỚI: Toạ độ "Neo" (Anchor) - 50% chiều rộng, 40% chiều cao (giữa hai mắt)
 static const double ANCHOR_X_RATIO = 0.50;
