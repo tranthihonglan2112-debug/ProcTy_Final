@@ -37,10 +37,7 @@ public class FloatingService extends Service {
         System.loadLibrary("procty");
     }
 
-    // SỬA ĐỔI: Tách riêng hàm nạp ảnh mẫu và hàm tìm kiếm
     private native boolean nativeLoadTemplate(byte[] templateData);
-    // buffer = TOÀN BỘ khung hình; (roiX,roiY,roiW,roiH) = vùng quét. Cắt ROI ở C++ bằng cv::Mat(stride thật).
-    // MỚI: đo tỉ lệ vuốt (hiệu chuẩn)
     private native boolean nativeCalibStore(ByteBuffer buffer, int fullW, int fullH, int rowStride, int slot);
     private native long nativeCalibShift();
     private native long nativeFindTarget(ByteBuffer buffer, int fullW, int fullH, int rowStride,
@@ -51,26 +48,26 @@ public class FloatingService extends Service {
     private static final String TAG_ERROR = "ProcTyError";
 
     private static final boolean REQUIRE_LANDSCAPE = true;
-    private static final long MIN_SWIPE_INTERVAL_MS = 100; 
+    private static final long MIN_SWIPE_INTERVAL_MS = 50; 
 
-    // ---- MỚI: vuốt TƯƠNG ĐỐI có hiệu chuẩn (thay cho "kéo tới toạ độ tuyệt đối của mục tiêu") ----
-    private static final int SWIPE_START_X = 1299;      // giữ nguyên điểm đầu cũ
+    private static final int SWIPE_START_X = 1299;      
     private static final int SWIPE_START_Y = 360;
-    private static final double DEAD_ZONE_PX = 6.0;     // mục tiêu đã sát tâm thì KHÔNG vuốt
-    private static final double DAMP = 0.95;
+    private static final double DEAD_ZONE_PX = 6.0;     
+    private static final double DAMP = 0.95;             
     private static final double MAX_DRAG_PX = 450.0;
-    private static final int SWIPE_STEPS = 5;           // 5 điểm MOVE thay vì 1
-    private static final int SWIPE_STEP_MS = 8;         // tổng ~50ms
-    private static final int CONFIRM_PX = 80;
-    private static final int CAL_DRAG_PX = 40;          // vuốt thử khi hiệu chuẩn
-    private static final int CAL_REPEATS = 3;           // mỗi trục đo 3 lần rồi lấy trung vị
-    private static final long CAL_SETTLE_MS = 450;      // chờ camera đứng yên rồi mới chụp khung B
+    private static final int SWIPE_STEPS = 5;           
+    private static final int SWIPE_STEP_MS = 8;         
+    private static final int CONFIRM_PX = 100;           
+    private static final int CAL_DRAG_PX = 40;          
+    private static final int CAL_REPEATS = 3;           
+    private static final long CAL_SETTLE_MS = 450;      
 
     private static boolean crashHandlerInstalled = false;
 
     private WindowManager windowManager;
     private View roiView;
-    private View debugDotView; // BIẾN MỚI: Dùng để vẽ chấm tròn debug
+    private View debugDotView; // Chấm đỏ (địch)
+    private View debugCenterView; // MỚI: Chấm vàng (tâm khung xanh)
     
     private DisplayManager displayManager;
     private MediaProjection mediaProjection;
@@ -94,17 +91,15 @@ public class FloatingService extends Service {
     private int roiRealX = 0;
     private int roiRealY = 0;
 
-    // TỐI ƯU: Lưu ảnh mẫu vào bộ nhớ 1 lần
     private byte[] cachedTemplateData = null;
 
-    // MỚI: tỉ lệ vuốt g = px cảnh dịch / px ngón tay (0 = chưa hiệu chuẩn), tách trục X/Y
     private double aimGx = 0, aimGy = 0;
     private int calStep = 0, calPhase = 0, calSign = 1, calFail = 0;
     private long calReadyAt = 0;
     private final double[] calG = new double[CAL_REPEATS];
     private int calGn = 0;
     private boolean maaRestartTried = false;
-    private int lastDx = Integer.MIN_VALUE, lastDy = 0;     // xác nhận 2 lần quét liên tiếp
+    private int lastDx = Integer.MIN_VALUE, lastDy = 0;     
     private long scanNs = 0;
     private int scanN = 0;
     private int lastLoadedMode = -1;
@@ -306,6 +301,9 @@ public class FloatingService extends Service {
                     }
                     roiRealX = loc[0];
                     roiRealY = loc[1];
+
+                    // MỚI: Vẽ chấm vàng ở tâm khung xanh
+                    showDebugCenter(roiRealX + (roiBoxSize / 2), roiRealY + (roiBoxSize / 2));
                 } catch (Exception e) {
                     Log.e(TAG_ERROR, "Không lấy được vị trí ROI thật: " + e);
                 }
@@ -315,7 +313,37 @@ public class FloatingService extends Service {
         }
     }
 
-    // HÀM MỚI: Vẽ chấm tròn màu đỏ để debug
+    // MỚI: Hàm vẽ chấm vàng ở tâm khung xanh
+    private void showDebugCenter(int x, int y) {
+        try {
+            if (debugCenterView == null) {
+                debugCenterView = new View(this);
+                GradientDrawable circle = new GradientDrawable();
+                circle.setShape(GradientDrawable.OVAL); 
+                circle.setColor(0xFFFFFF00); // Màu vàng
+                circle.setStroke(2, 0xFF000000); 
+                debugCenterView.setBackground(circle);
+
+                int type = (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) ?
+                        WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY : WindowManager.LayoutParams.TYPE_PHONE;
+
+                WindowManager.LayoutParams params = new WindowManager.LayoutParams(
+                        16, 16, // Kích thước chấm vàng
+                        type, WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
+                        PixelFormat.TRANSLUCENT
+                );
+                params.gravity = Gravity.TOP | Gravity.LEFT;
+                windowManager.addView(debugCenterView, params);
+            }
+            WindowManager.LayoutParams p = (WindowManager.LayoutParams) debugCenterView.getLayoutParams();
+            p.x = x - 8; 
+            p.y = y - 8;
+            windowManager.updateViewLayout(debugCenterView, p);
+        } catch (Exception e) {
+            Log.e(TAG_ERROR, "Lỗi vẽ chấm tâm: " + e.getMessage());
+        }
+    }
+
     private void showDebugDot(int x, int y) {
         try {
             if (debugDotView == null) {
@@ -602,10 +630,14 @@ public class FloatingService extends Service {
             roiView = null;
         }
 
-        // XÓA CHẤM ĐỎ KHI TẮT
+        // XÓA CHẤM ĐỎ VÀ CHẤM VÀNG KHI TẮT
         if (debugDotView != null && windowManager != null) {
             try { windowManager.removeView(debugDotView); } catch (Exception ignored) {}
             debugDotView = null;
+        }
+        if (debugCenterView != null && windowManager != null) {
+            try { windowManager.removeView(debugCenterView); } catch (Exception ignored) {}
+            debugCenterView = null;
         }
 
         ImageReader reader = imageReader;
@@ -644,4 +676,4 @@ public class FloatingService extends Service {
         
         MinitouchController.close();
     }
-}
+    }
