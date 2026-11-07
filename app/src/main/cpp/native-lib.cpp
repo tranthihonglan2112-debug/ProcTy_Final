@@ -34,9 +34,11 @@ static const double SCALE_STEP = 1.12;
 static const int SCALE_MIN_K = -8;         
 static const int SCALE_MAX_K = 5;          
 static const int MIN_TPL_PX = 8;           
+// Cổng màu: tương quan histogram HSV tối thiểu giữa ứng viên và ảnh mẫu.
+// Đặt -1.0 để TẮT hẳn cổng màu (HISTCMP_CORREL nằm trong [-1, 1]).
 static const double COLOR_MIN_CORREL = 0.5;
 
-// MỚI: Toạ độ "Neo" (Anchor) - 50% chiều rộng, 40% chiều cao (giữa hai mắt)
+// Toạ độ "Neo" (Anchor) tính theo tỉ lệ của ảnh mẫu: 50% chiều rộng, 40% chiều cao.
 static const double ANCHOR_X_RATIO = 0.50;
 static const double ANCHOR_Y_RATIO = 0.40;
 
@@ -54,6 +56,10 @@ static cv::Mat colorHist(const cv::Mat &rgb, const cv::Mat &mask) {
 
 static int g_logCounter = 0;
 
+// HỢP ĐỒNG TOẠ ĐỘ C++ <-> Java (nativeFindTarget):
+//   delta = (điểm Neo) - (TÂM ROI), đơn vị px màn hình thật, gốc toạ độ = góc trên-trái ROI.
+//   TÂM ROI = (roiW / 2, roiH / 2)  -> trên màn hình là (roiX + roiW/2, roiY + roiH/2).
+//   Java PHẢI cộng delta vào TÂM ROI (AnchorMath.toScreen), KHÔNG được cộng vào góc ROI.
 static inline jlong packDelta(int dx, int dy) {
     uint32_t uX = (uint32_t) (dx + 2000);
     uint32_t uY = (uint32_t) (dy + 2000);
@@ -193,9 +199,8 @@ Java_com_my_procty_FloatingService_nativeFindTarget(JNIEnv *env, jobject /*thiz*
         cv::resize(rgb, small, cv::Size(), DOWNSCALE, DOWNSCALE, cv::INTER_AREA);
 
         double bestVal = 0.0, bestScale = 0.0;
-        cv::Point bestLoc(0, 0);
         int bestIdx = -1;
-        cv::Point bestRaw(0, 0);     
+        cv::Point bestRaw(0, 0);     // góc trên-trái ứng viên tốt nhất (toạ độ nửa độ phân giải, trong ROI)
 
         for (size_t i = 0; i < g_tpls.size(); i++) {
             const cv::Mat &t = g_tpls[i];
@@ -229,12 +234,6 @@ Java_com_my_procty_FloatingService_nativeFindTarget(JNIEnv *env, jobject /*thiz*
                 bestIdx = (int) i;
                 bestRaw = maxLoc;
                 bestScale = g_tplScales[i];
-                
-                // MỚI: Tính toạ độ "Neo" (mắt địch) thay vì tâm hình học
-                double anchorX_in_tpl = t.cols * ANCHOR_X_RATIO;
-                double anchorY_in_tpl = t.rows * ANCHOR_Y_RATIO;
-                bestLoc = cv::Point(cvRound((maxLoc.x + anchorX_in_tpl) / DOWNSCALE),
-                                    cvRound((maxLoc.y + anchorY_in_tpl) / DOWNSCALE));
             }
         }
 
@@ -244,7 +243,27 @@ Java_com_my_procty_FloatingService_nativeFindTarget(JNIEnv *env, jobject /*thiz*
         }
 
         if (bestVal >= MATCH_THRESHOLD && bestIdx >= 0) {
-            return packDelta(bestLoc.x - centerX, bestLoc.y - centerY);
+            const cv::Mat &t = g_tpls[bestIdx];
+            cv::Rect r(bestRaw.x, bestRaw.y, t.cols, t.rows);
+
+            // CỔNG MÀU (khôi phục - commit Neo đã xoá nhầm). Chỉ dựa vào hình dạng thì avatar
+            // khác màu vẫn đạt ~0.7-0.85 -> báo nhầm. Tăng MATCH_THRESHOLD KHÔNG loại được chúng.
+            if (COLOR_MIN_CORREL > -1.0 && (r & cv::Rect(0, 0, small.cols, small.rows)) == r) {
+                double col = cv::compareHist(g_tplHist[bestIdx], colorHist(small(r), g_masks[bestIdx]),
+                                             cv::HISTCMP_CORREL);
+                if (col < COLOR_MIN_CORREL) {
+                    if ((++g_logCounter % 10) == 0)
+                        LOGD("mode2: bỏ ứng viên vì sai màu (hình=%.2f, màu=%.2f)", bestVal, col);
+                    return 0;
+                }
+            }
+
+            // NEO: vị trí (tỉ lệ) bên trong ảnh mẫu đã co giãn, đổi về độ phân giải thật, TRONG ROI.
+            const int anchorX = cvRound((bestRaw.x + t.cols * ANCHOR_X_RATIO) / DOWNSCALE);
+            const int anchorY = cvRound((bestRaw.y + t.rows * ANCHOR_Y_RATIO) / DOWNSCALE);
+
+            // delta so với TÂM ROI (xem "HỢP ĐỒNG TOẠ ĐỘ" ở packDelta).
+            return packDelta(anchorX - centerX, anchorY - centerY);
         }
     }
 

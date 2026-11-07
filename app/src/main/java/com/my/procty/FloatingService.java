@@ -450,32 +450,38 @@ public class FloatingService extends Service {
                 scanNs = 0;
             }
 
-            if (result != 0) {
-                int deltaX = (int) (result >> 32) - 2000;
-                int deltaY = (int) (result & 0xFFFFFFFFL) - 2000;
-                double dist = Math.hypot(deltaX, deltaY);
+            int[] delta = AnchorMath.decodeDelta(result);
+            if (delta != null) {
+                final int deltaX = delta[0];   // Neo - TÂM ROI (do C++ trả về)
+                final int deltaY = delta[1];
 
-                // MỚI: Vì C++ đã trả về toạ độ "Neo" (mắt địch) so với tâm ROI, 
-                // nên Java chỉ cần cộng trực tiếp với toạ độ gốc của ROI (roiRealX, roiRealY)
-                int targetX = roiRealX + deltaX;
-                int targetY = roiRealY + deltaY;
+                // Toạ độ tuyệt đối của Neo trên màn hình = TÂM ROI + delta.
+                // (Bản lỗi dùng roiRealX + deltaX = GỐC ROI + delta -> lệch (-150,-150) px.)
+                int[] tgt = AnchorMath.toScreen(roiX, roiY, roiW, roiH, deltaX, deltaY);
+                int targetX = tgt[0];
+                int targetY = tgt[1];
 
-                // GỌI HÀM VẼ CHẤM ĐỎ DEBUG Ở ĐÂY
-                showDebugDot(targetX, targetY); 
+                // CHẤM ĐỎ DEBUG: nằm đúng trên điểm Neo
+                showDebugDot(targetX, targetY);
+
+                // Độ lệch Neo so với TÂM SÚNG: đây mới là thứ cần vuốt để triệt tiêu.
+                int relativeDeltaX = targetX - FF_CROSSHAIR_X;
+                int relativeDeltaY = targetY - FF_CROSSHAIR_Y;
+                double dist = Math.hypot(relativeDeltaX, relativeDeltaY);
 
                 long now = SystemClock.uptimeMillis();
-                
+
                 if (dist >= DEAD_ZONE_PX && now - lastSwipeUptime >= MIN_SWIPE_INTERVAL_MS) {
                     lastSwipeUptime = now;
-                    // Trong AimMath, deltaX/Y cần được hiểu là độ lệch so với tâm súng. 
-                    // Vì targetX/Y đã là toạ độ tuyệt đối của mắt địch, ta cần tính delta so với tâm súng (FF_CROSSHAIR)
-                    int relativeDeltaX = targetX - FF_CROSSHAIR_X;
-                    int relativeDeltaY = targetY - FF_CROSSHAIR_Y;
 
                     int[] end = AimMath.relativeEnd(SWIPE_START_X, SWIPE_START_Y, relativeDeltaX, relativeDeltaY,
                             aimGx, aimGy, DAMP, MAX_DRAG_PX, imgW, imgH);
-                    Log.d("ProcTyTarget", "target=(" + targetX + "," + targetY + ") g=(" + aimGx + "," + aimGy
-                            + ") -> vuốt " + SWIPE_START_X + "," + SWIPE_START_Y + " => " + end[0] + "," + end[1]);
+                    Log.d("ProcTyTarget", "roi=(" + roiX + "," + roiY + " " + roiW + "x" + roiH + ")"
+                            + " delta=(" + deltaX + "," + deltaY + ")"
+                            + " target=(" + targetX + "," + targetY + ")"
+                            + " rel=(" + relativeDeltaX + "," + relativeDeltaY + ")"
+                            + " g=(" + aimGx + "," + aimGy + ")"
+                            + " -> vuốt " + SWIPE_START_X + "," + SWIPE_START_Y + " => " + end[0] + "," + end[1]);
                     MinitouchController.swipePath(
                             AimMath.easedPath(SWIPE_START_X, SWIPE_START_Y, end[0], end[1], SWIPE_STEPS), SWIPE_STEP_MS);
                 }
