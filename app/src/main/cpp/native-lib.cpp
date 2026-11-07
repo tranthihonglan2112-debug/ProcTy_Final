@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <vector>
+#include <algorithm>
 #include <opencv2/opencv.hpp>
 
 #define LOG_TAG "ProcTyNative"
@@ -23,11 +24,12 @@ static std::vector<double> g_tplScales;    // tỉ lệ so với ảnh mẫu g�
 static bool g_templateLoaded = false;
 static bool g_hasMask = false;
 static bool g_matchFailLogged = false;
+static std::vector<cv::Mat> g_tplHist;     // MỚI: histogram HSV (trong mask) của từng tỉ lệ – dùng để phân biệt avatar khác màu
+static cv::Mat g_calib[2];                 // MỚI: 2 khung xám nửa độ phân giải để đo tỉ lệ vuốt (hiệu chuẩn)
 
 static const double DOWNSCALE = 0.5;       // hệ số thu nhỏ khi so khớp
 
-// ĐÃ NÂNG từ 0.65 lên 0.78: khi có mask, nền game không có mục tiêu vẫn có thể đạt ~0.70,
-// còn mục tiêu thật thường >= 0.85 (số liệu từ mô phỏng). Hãy chỉnh lại theo log "mode2: best=..." trên máy thật.
+
 static const double MATCH_THRESHOLD = 0.65;
 
 // TM_CCOEFF_NORMED có mask. Nếu bản OpenCV của bạn báo lỗi ở dòng log "matchTemplate lỗi",
@@ -40,6 +42,20 @@ static const double SCALE_STEP = 1.12;     // bước tỉ lệ ~12%
 static const int SCALE_MIN_K = -6;         // 1.12^-6 ~ 0.51x
 static const int SCALE_MAX_K = 6;          // 1.12^6  ~ 1.97x (có đúng 1.0x ở k=0)
 static const int MIN_TPL_PX = 8;           // template nhỏ hơn mức này (sau thu nhỏ) thì bỏ
+static const double COLOR_MIN_CORREL = 0.5; // MỚI: tương quan histogram HSV tối thiểu giữa ứng viên và ảnh mẫu
+
+// MỚI: histogram HSV 18x8 (H,S) trong vùng mask, chuẩn hoá L1. Ảnh vào là RGB.
+static cv::Mat colorHist(const cv::Mat &rgb, const cv::Mat &mask) {
+    cv::Mat hsv, hist;
+    cv::cvtColor(rgb, hsv, cv::COLOR_RGB2HSV);
+    int channels[] = {0, 1};
+    int histSize[] = {18, 8};
+    float hr[] = {0.f, 180.f}, sr[] = {0.f, 256.f};
+    const float *ranges[] = {hr, sr};
+    cv::calcHist(&hsv, 1, channels, mask, hist, 2, histSize, ranges);
+    cv::normalize(hist, hist, 1.0, 0.0, cv::NORM_L1);
+    return hist;
+}
 
 static int g_logCounter = 0;
 
@@ -57,6 +73,7 @@ Java_com_my_procty_FloatingService_nativeLoadTemplate(JNIEnv *env, jobject /*thi
     g_tpls.clear();
     g_masks.clear();
     g_tplScales.clear();
+    g_tplHist.clear();
 
     if (templateData == nullptr) {          // Java chủ động xoá ảnh mẫu (chuyển sang mode màu)
         return JNI_TRUE;
@@ -119,6 +136,7 @@ Java_com_my_procty_FloatingService_nativeLoadTemplate(JNIEnv *env, jobject /*thi
         g_tpls.push_back(t);
         g_masks.push_back(m);
         g_tplScales.push_back(s);
+        g_tplHist.push_back(colorHist(t, m));
     }
 
     g_hasMask = useMask;
@@ -198,6 +216,8 @@ Java_com_my_procty_FloatingService_nativeFindTarget(JNIEnv *env, jobject /*thiz*
 
         double bestVal = 0.0, bestScale = 0.0;
         cv::Point bestLoc(0, 0);
+        int bestIdx = -1;
+        cv::Point bestRaw(0, 0);     // MỚI: góc trên-trái ứng viên (nửa độ phân giải)
 
         for (size_t i = 0; i < g_tpls.size(); i++) {
             const cv::Mat &t = g_tpls[i];
@@ -230,6 +250,8 @@ Java_com_my_procty_FloatingService_nativeFindTarget(JNIEnv *env, jobject /*thiz*
 
             if (maxVal > bestVal) {
                 bestVal = maxVal;
+                bestIdx = (int) i;
+                bestRaw = maxLoc;
                 bestScale = g_tplScales[i];
                 bestLoc = cv::Point(cvRound((maxLoc.x + t.cols * 0.5) / DOWNSCALE),
                                     cvRound((maxLoc.y + t.rows * 0.5) / DOWNSCALE));
@@ -242,10 +264,71 @@ Java_com_my_procty_FloatingService_nativeFindTarget(JNIEnv *env, jobject /*thiz*
                  bestVal, bestScale, MATCH_THRESHOLD, g_hasMask ? "có" : "không");
         }
 
-        if (bestVal >= MATCH_THRESHOLD) {
+        if (bestVal >= MATCH_THRESHOLD && bestIdx >= 0) {
+            // MỚI: cổng màu. Chỉ hình dạng thì avatar khác màu vẫn đạt ~0.7-0.85 -> báo nhầm.
+            const cv::Mat &t = g_tpls[bestIdx];
+            cv::Rect r(bestRaw.x, bestRaw.y, t.cols, t.rows);
+            if ((r & cv::Rect(0, 0, small.cols, small.rows)) == r) {
+                double col = cv::compareHist(g_tplHist[bestIdx], colorHist(small(r), g_masks[bestIdx]), cv::HISTCMP_CORREL);
+                if (col < COLOR_MIN_CORREL) {
+                    if ((++g_logCounter % 10) == 0) LOGD("mode2: bỏ ứng viên vì sai màu (hình=%.2f, màu=%.2f)", bestVal, col);
+                    return 0;
+                }
+            }
             return packDelta(bestLoc.x - centerX, bestLoc.y - centerY);
         }
     }
 
     return 0;
+}
+
+
+// ---------------------------------------------------------------------------
+// MỚI – ĐO TỈ LỆ VUỐT (hiệu chuẩn): g = (px cảnh dịch) / (px ngón tay vuốt).
+// nativeCalibStore: lưu khung hiện tại (xám, nửa độ phân giải) vào slot 0 hoặc 1.
+// nativeCalibShift: dịch chuyển cảnh slot0 -> slot1 (px MÀN HÌNH THẬT), đo theo 3x2 ô rồi lấy TRUNG VỊ
+//                   (chịu được kẻ địch di chuyển / HUD tĩnh; phase-correlation toàn khung thì KHÔNG).
+// Trả về ((sx*10 + 200000) << 32) | (sy*10 + 200000); 0 nếu không đo được.
+// ---------------------------------------------------------------------------
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_my_procty_FloatingService_nativeCalibStore(JNIEnv *env, jobject /*thiz*/, jobject buffer,
+                                                     jint fullW, jint fullH, jint rowStride, jint slot) {
+    if (slot < 0 || slot > 1) return JNI_FALSE;
+    uint8_t *pixels = (uint8_t *) env->GetDirectBufferAddress(buffer);
+    jlong capacity = env->GetDirectBufferCapacity(buffer);
+    if (pixels == nullptr || capacity < (jlong) (fullH - 1) * rowStride + (jlong) fullW * 4) return JNI_FALSE;
+    cv::Mat screen(fullH, fullW, CV_8UC4, pixels, (size_t) rowStride);
+    cv::Mat gray, small;
+    cv::cvtColor(screen, gray, cv::COLOR_RGBA2GRAY);
+    cv::resize(gray, small, cv::Size(), 0.5, 0.5, cv::INTER_AREA);
+    small.convertTo(g_calib[slot], CV_32F);
+    return JNI_TRUE;
+}
+
+extern "C" JNIEXPORT jlong JNICALL
+Java_com_my_procty_FloatingService_nativeCalibShift(JNIEnv * /*env*/, jobject /*thiz*/) {
+    const cv::Mat &a = g_calib[0], &b = g_calib[1];
+    if (a.empty() || b.empty() || a.size() != b.size()) return 0;
+    const int tilesX = 3, tilesY = 2;
+    const int tw = a.cols / tilesX, th = a.rows / tilesY;
+    if (tw < 64 || th < 64) return 0;
+    cv::Mat win;
+    cv::createHanningWindow(win, cv::Size(tw, th), CV_32F);
+    std::vector<double> xs, ys;
+    for (int ty = 0; ty < tilesY; ty++) {
+        for (int tx = 0; tx < tilesX; tx++) {
+            cv::Rect r(tx * tw, ty * th, tw, th);
+            double resp = 0.0;
+            cv::Point2d sh = cv::phaseCorrelate(a(r), b(r), win, &resp);
+            if (resp > 0.05) { xs.push_back(sh.x); ys.push_back(sh.y); }
+        }
+    }
+    if (xs.size() < 3) return 0;                       // quá ít ô tin cậy
+    std::sort(xs.begin(), xs.end());
+    std::sort(ys.begin(), ys.end());
+    double sx = xs[xs.size() / 2] * 2.0;               // nửa độ phân giải -> màn hình thật
+    double sy = ys[ys.size() / 2] * 2.0;
+    jlong px = (jlong) std::llround(sx * 10.0) + 200000;
+    jlong py = (jlong) std::llround(sy * 10.0) + 200000;
+    return (px << 32) | py;
 }

@@ -40,6 +40,9 @@ public class FloatingService extends Service {
     // SỬA ĐỔI: Tách riêng hàm nạp ảnh mẫu và hàm tìm kiếm
     private native boolean nativeLoadTemplate(byte[] templateData);
     // buffer = TOÀN BỘ khung hình; (roiX,roiY,roiW,roiH) = vùng quét. Cắt ROI ở C++ bằng cv::Mat(stride thật).
+    // MỚI: đo tỉ lệ vuốt (hiệu chuẩn)
+    private native boolean nativeCalibStore(ByteBuffer buffer, int fullW, int fullH, int rowStride, int slot);
+    private native long nativeCalibShift();
     private native long nativeFindTarget(ByteBuffer buffer, int fullW, int fullH, int rowStride,
                                          int roiX, int roiY, int roiW, int roiH,
                                          int mode, int cR, int cG, int cB);
@@ -50,10 +53,25 @@ public class FloatingService extends Service {
     private static final boolean REQUIRE_LANDSCAPE = true;
     private static final long MIN_SWIPE_INTERVAL_MS = 200; 
 
+    // ---- MỚI: vuốt TƯƠNG ĐỐI có hiệu chuẩn (thay cho "kéo tới toạ độ tuyệt đối của mục tiêu") ----
+    private static final int SWIPE_START_X = 1299;      // giữ nguyên điểm đầu cũ
+    private static final int SWIPE_START_Y = 360;
+    private static final double DEAD_ZONE_PX = 6.0;     // mục tiêu đã sát tâm thì KHÔNG vuốt
+    private static final double DAMP = 0.8;             // sửa 80% mỗi nhịp, tránh vọt lố khi g ước lượng lệch
+    private static final double MAX_DRAG_PX = 450.0;
+    private static final int SWIPE_STEPS = 5;           // 5 điểm MOVE thay vì 1
+    private static final int SWIPE_STEP_MS = 8;         // tổng ~50ms
+    private static final int CONFIRM_PX = 40;           // 2 lần quét liên tiếp phải cùng chỗ (±40px) mới vuốt
+    private static final int CAL_DRAG_PX = 40;          // vuốt thử khi hiệu chuẩn
+    private static final int CAL_REPEATS = 3;           // mỗi trục đo 3 lần rồi lấy trung vị
+    private static final long CAL_SETTLE_MS = 450;      // chờ camera đứng yên rồi mới chụp khung B
+
     private static boolean crashHandlerInstalled = false;
 
     private WindowManager windowManager;
     private View roiView;
+    private View debugDotView; // BIẾN MỚI: Dùng để vẽ chấm tròn debug
+    
     private DisplayManager displayManager;
     private MediaProjection mediaProjection;
     private volatile VirtualDisplay virtualDisplay;
@@ -78,6 +96,17 @@ public class FloatingService extends Service {
 
     // TỐI ƯU: Lưu ảnh mẫu vào bộ nhớ 1 lần
     private byte[] cachedTemplateData = null;
+
+    // MỚI: tỉ lệ vuốt g = px cảnh dịch / px ngón tay (0 = chưa hiệu chuẩn), tách trục X/Y
+    private double aimGx = 0, aimGy = 0;
+    private int calStep = 0, calPhase = 0, calSign = 1, calFail = 0;
+    private long calReadyAt = 0;
+    private final double[] calG = new double[CAL_REPEATS];
+    private int calGn = 0;
+    private boolean maaRestartTried = false;
+    private int lastDx = Integer.MIN_VALUE, lastDy = 0;     // xác nhận 2 lần quét liên tiếp
+    private long scanNs = 0;
+    private int scanN = 0;
     private int lastLoadedMode = -1;
 
     @Override
@@ -90,6 +119,8 @@ public class FloatingService extends Service {
         installCrashLogger();
         super.onCreate();
         prefs = getSharedPreferences("proc_ty_settings", MODE_PRIVATE);
+        aimGx = prefs.getFloat("aim_gx", 0f);
+        aimGy = prefs.getFloat("aim_gy", 0f);
         windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
 
         try {
@@ -265,8 +296,53 @@ public class FloatingService extends Service {
 
             windowManager.addView(roiView, params);
             Log.i(TAG_FRAME, "Đã vẽ khung ROI tại X=" + params.x + ", Y=" + params.y);
+
+            roiView.post(() -> {
+                try {
+                    int[] loc = new int[2];
+                    roiView.getLocationOnScreen(loc);
+                    if (loc[0] != roiRealX || loc[1] != roiRealY) {
+                        Log.w(TAG_FRAME, "ROI lệch: params=(" + roiRealX + "," + roiRealY + ") thật=(" + loc[0] + "," + loc[1] + ") -> dùng toạ độ thật");
+                    }
+                    roiRealX = loc[0];
+                    roiRealY = loc[1];
+                } catch (Exception e) {
+                    Log.e(TAG_ERROR, "Không lấy được vị trí ROI thật: " + e);
+                }
+            });
         } catch (Exception e) {
             Log.e(TAG_ERROR, "Lỗi vẽ khung ROI: " + e.getMessage());
+        }
+    }
+
+    // HÀM MỚI: Vẽ chấm tròn màu đỏ để debug
+    private void showDebugDot(int x, int y) {
+        try {
+            if (debugDotView == null) {
+                debugDotView = new View(this);
+                GradientDrawable circle = new GradientDrawable();
+                circle.setShape(GradientDrawable.OVAL); 
+                circle.setColor(0xFFFF0000); // Màu đỏ
+                circle.setStroke(3, 0xFFFFFFFF); 
+                debugDotView.setBackground(circle);
+
+                int type = (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) ?
+                        WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY : WindowManager.LayoutParams.TYPE_PHONE;
+
+                WindowManager.LayoutParams params = new WindowManager.LayoutParams(
+                        20, 20, 
+                        type, WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
+                        PixelFormat.TRANSLUCENT
+                );
+                params.gravity = Gravity.TOP | Gravity.LEFT;
+                windowManager.addView(debugDotView, params);
+            }
+            WindowManager.LayoutParams p = (WindowManager.LayoutParams) debugDotView.getLayoutParams();
+            p.x = x - 10; 
+            p.y = y - 10;
+            windowManager.updateViewLayout(debugDotView, p);
+        } catch (Exception e) {
+            Log.e(TAG_ERROR, "Lỗi vẽ chấm debug: " + e.getMessage());
         }
     }
 
@@ -298,9 +374,6 @@ public class FloatingService extends Service {
             ByteBuffer buffer = planes[0].getBuffer();
             int rowStride = planes[0].getRowStride();
 
-            // ROI thật (lùi 5px để né viền xanh).
-            // KHÔNG dùng buffer.position(): JNI GetDirectBufferAddress luôn trả địa chỉ GỐC của buffer,
-            // nên C++ sẽ đọc từ góc trên-trái màn hình chứ không phải từ ROI. Truyền toạ độ ROI sang C++.
             final int roiInset = 5;
             final int roiX = roiRealX + roiInset;
             final int roiY = roiRealY + roiInset;
@@ -312,15 +385,15 @@ public class FloatingService extends Service {
                 return;
             }
 
-            // TỐI ƯU: NẠP ẢNH MẪU 1 LẦN DUY NHẤT
+            if (calibrateStep(buffer, imgW, imgH, rowStride)) return;
+
             if (mode == 2) {
-                // Nếu vừa đổi sang mode 2, hoặc chưa có ảnh mẫu -> Nạp 1 lần
                 if (lastLoadedMode != 2 || cachedTemplateData == null) {
                     File tplFile = new File("/storage/emulated/0/Download/head_front.png");
                     if (tplFile.exists()) {
                         try {
-                            byte[] data = java.nio.file.Files.readAllBytes(tplFile.toPath()); // đọc ĐỦ file
-                            if (nativeLoadTemplate(data)) {   // giải mã 1 lần ở C++
+                            byte[] data = java.nio.file.Files.readAllBytes(tplFile.toPath()); 
+                            if (nativeLoadTemplate(data)) {   
                                 cachedTemplateData = data;
                                 lastLoadedMode = 2;
                                 Log.d(TAG_FRAME, "Đã nạp ảnh mẫu (" + data.length + " byte)");
@@ -336,28 +409,49 @@ public class FloatingService extends Service {
                 }
             } else {
                 if (lastLoadedMode != 1) {
-                    nativeLoadTemplate(null); // Xóa ảnh mẫu trong C++ nếu chuyển về mode màu
+                    nativeLoadTemplate(null); 
                     lastLoadedMode = 1;
                 }
             }
 
-            // Chỉ cần truyền buffer vào, C++ đã có sẵn ảnh mẫu trong bộ nhớ
+            long t0 = System.nanoTime();
             long result = nativeFindTarget(buffer, imgW, imgH, rowStride, roiX, roiY, roiW, roiH, mode, cR, cG, cB);
+            scanNs += System.nanoTime() - t0;
+            if (++scanN >= 30) {                      
+                Log.d("ProcTyPerf", "so khớp TB " + (scanNs / scanN) / 1000000.0 + " ms/lần (30 lần gần nhất)");
+                scanN = 0;
+                scanNs = 0;
+            }
 
             if (result != 0) {
                 int deltaX = (int) (result >> 32) - 2000;
                 int deltaY = (int) (result & 0xFFFFFFFFL) - 2000;
-                
+                double dist = Math.hypot(deltaX, deltaY);
+
+                boolean confirmed = lastDx != Integer.MIN_VALUE
+                        && Math.abs(deltaX - lastDx) <= CONFIRM_PX && Math.abs(deltaY - lastDy) <= CONFIRM_PX;
+                lastDx = deltaX;
+                lastDy = deltaY;
+
                 int targetX = roiRealX + (roiBoxSize / 2) + deltaX;
                 int targetY = roiRealY + (roiBoxSize / 2) + deltaY;
 
-                Log.d("ProcTyTarget", "Kéo tâm tới: X=" + targetX + ", Y=" + targetY);
+                // GỌI HÀM VẼ CHẤM ĐỎ DEBUG Ở ĐÂY
+                showDebugDot(targetX, targetY); 
 
                 long now = SystemClock.uptimeMillis();
-                if (now - lastSwipeUptime >= MIN_SWIPE_INTERVAL_MS) {
+                if (confirmed && dist >= DEAD_ZONE_PX && now - lastSwipeUptime >= MIN_SWIPE_INTERVAL_MS) {
                     lastSwipeUptime = now;
-                    MinitouchController.swipe(1299, 360, targetX, targetY, 10);
+                    int[] end = AimMath.relativeEnd(SWIPE_START_X, SWIPE_START_Y, deltaX, deltaY,
+                            aimGx, aimGy, DAMP, MAX_DRAG_PX, imgW, imgH);
+                    Log.d("ProcTyTarget", "delta=(" + deltaX + "," + deltaY + ") g=(" + aimGx + "," + aimGy
+                            + ") -> vuốt " + SWIPE_START_X + "," + SWIPE_START_Y + " => " + end[0] + "," + end[1]);
+                    MinitouchController.swipePath(
+                            AimMath.easedPath(SWIPE_START_X, SWIPE_START_Y, end[0], end[1], SWIPE_STEPS), SWIPE_STEP_MS);
+                    lastDx = Integer.MIN_VALUE;       
                 }
+            } else {
+                lastDx = Integer.MIN_VALUE;           
             }
         } catch (Exception e) {
             Log.e(TAG_ERROR, "Lỗi frame: " + e, e);
@@ -365,6 +459,77 @@ public class FloatingService extends Service {
             if (image != null) image.close();
         }
     };
+
+    private boolean calibrateStep(ByteBuffer buffer, int imgW, int imgH, int rowStride) {
+        if (aimGx != 0 && aimGy != 0) return false;
+        if (!MinitouchController.isReady()) {
+            MinitouchController.ensureStarted();
+            return true;
+        }
+
+        long now = SystemClock.uptimeMillis();
+        boolean horizontal = calStep < CAL_REPEATS;
+
+        if (calPhase == 0) {
+            if (calStep == 0) {
+                int mx = MinitouchController.getMaxX(), my = MinitouchController.getMaxY();
+                if (mx > 0 && (mx != imgW || my != imgH)) {
+                    Log.e(TAG_ERROR, "MaaTouch dùng toạ độ " + mx + "x" + my + " nhưng khung chụp là " + imgW + "x" + imgH
+                            + " => toạ độ vuốt sẽ SAI. " + (maaRestartTried ? "Đã khởi động lại 1 lần mà vẫn lệch." : "Khởi động lại MaaTouch."));
+                    if (!maaRestartTried) {
+                        maaRestartTried = true;
+                        MinitouchController.close();
+                        MinitouchController.init(this);
+                        return true;
+                    }
+                }
+            }
+            if (!nativeCalibStore(buffer, imgW, imgH, rowStride, 0)) return true;
+            calSign = ((calStep % 2) == 0) ? 1 : -1;       
+            int ex = SWIPE_START_X + (horizontal ? calSign * CAL_DRAG_PX : 0);
+            int ey = SWIPE_START_Y + (horizontal ? 0 : calSign * CAL_DRAG_PX);
+            MinitouchController.swipePath(AimMath.easedPath(SWIPE_START_X, SWIPE_START_Y, ex, ey, SWIPE_STEPS), SWIPE_STEP_MS);
+            calReadyAt = now + CAL_SETTLE_MS;
+            calPhase = 1;
+            return true;
+        }
+
+        if (now < calReadyAt) return true;
+        calPhase = 0;
+        if (!nativeCalibStore(buffer, imgW, imgH, rowStride, 1)) return true;
+        long r = nativeCalibShift();
+
+        double g = Double.NaN;
+        if (r != 0) {
+            double sx = ((int) (r >> 32) - 200000) / 10.0;
+            double sy = ((int) (r & 0xFFFFFFFFL) - 200000) / 10.0;
+            g = AimMath.gainFromShift(horizontal ? sx : sy, calSign * (double) CAL_DRAG_PX);
+            Log.d("ProcTyCal", (horizontal ? "X" : "Y") + " lần " + (calStep % CAL_REPEATS + 1)
+                    + ": cảnh dịch (" + sx + "," + sy + ") px => g=" + g);
+        } else {
+            Log.w("ProcTyCal", "không đo được dịch chuyển (cảnh quá phẳng/ít chi tiết?)");
+        }
+        if (!Double.isNaN(g)) calG[calGn++] = g; else calFail++;
+
+        boolean groupDone = ((calStep + 1) % CAL_REPEATS) == 0;
+        calStep++;
+        if (groupDone) {
+            double med = (calGn >= 2) ? AimMath.median(calG, calGn) : Double.NaN;
+            if (Double.isNaN(med)) {
+                Log.e("ProcTyCal", "Hiệu chuẩn trục " + (horizontal ? "X" : "Y") + " THẤT BẠI -> tạm dùng g=1.0 (không lưu)");
+                med = 1.0;
+            }
+            if (horizontal) aimGx = med; else aimGy = med;
+            calGn = 0;
+            if (!horizontal) {
+                Log.i("ProcTyCal", "Hiệu chuẩn xong: gx=" + aimGx + " gy=" + aimGy);
+                if (calFail == 0) prefs.edit().putFloat("aim_gx", (float) aimGx).putFloat("aim_gy", (float) aimGy).apply();
+            } else {
+                aimGy = 0;   
+            }
+        }
+        return true;
+    }
 
     private final MediaProjection.Callback projectionCallback = new MediaProjection.Callback() {
         @Override
@@ -419,6 +584,9 @@ public class FloatingService extends Service {
                 old.close();
             }
             Log.i(TAG_FRAME, "Đổi hướng/kích thước -> " + captureWidth + "x" + captureHeight + " @" + captureDpi + "dpi");
+            maaRestartTried = false;
+            MinitouchController.close();
+            MinitouchController.init(this);
         } catch (Exception e) {
             Log.e(TAG_ERROR, "Lỗi resize capture: " + e, e);
         }
@@ -432,6 +600,12 @@ public class FloatingService extends Service {
         if (roiView != null && windowManager != null) {
             try { windowManager.removeView(roiView); } catch (Exception ignored) {}
             roiView = null;
+        }
+
+        // XÓA CHẤM ĐỎ KHI TẮT
+        if (debugDotView != null && windowManager != null) {
+            try { windowManager.removeView(debugDotView); } catch (Exception ignored) {}
+            debugDotView = null;
         }
 
         ImageReader reader = imageReader;
@@ -470,4 +644,4 @@ public class FloatingService extends Service {
         
         MinitouchController.close();
     }
-    }
+}

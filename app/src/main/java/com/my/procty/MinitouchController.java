@@ -45,6 +45,12 @@ public class MinitouchController {
     private static volatile boolean ready = false;
     private static volatile boolean starting = false;
     private static volatile long lastStartMs = 0;
+    // MỚI: không gian toạ độ MaaTouch tự báo ở header "^ <contacts> <maxX> <maxY> <pressure>"
+    private static volatile int maxX = 0;
+    private static volatile int maxY = 0;
+
+    public static int getMaxX() { return maxX; }
+    public static int getMaxY() { return maxY; }
 
     /** true khi MaaTouch đang chạy và sẵn sàng nhận lệnh. */
     public static boolean isReady() {
@@ -95,6 +101,17 @@ public class MinitouchController {
         final StringBuilder errTail = new StringBuilder();
         pump(p.getInputStream(), "out", line -> {
             // MaaTouch in "^ ..." (thông số) và "$ <pid>" khi đã sẵn sàng
+            if (line.startsWith("^")) {
+                try {
+                    String[] f = line.trim().split("\\s+");   // ^ 10 <maxX> <maxY> <pressure>
+                    if (f.length >= 4) {
+                        maxX = Integer.parseInt(f[2]);
+                        maxY = Integer.parseInt(f[3]);
+                        Log.i(TAG, "Không gian toạ độ MaaTouch = " + maxX + "x" + maxY);
+                    }
+                } catch (NumberFormatException ignored) {
+                }
+            }
             if (line.startsWith("^") || line.startsWith("$")) headerSeen.countDown();
         });
         pump(p.getErrorStream(), "err", line -> {
@@ -231,6 +248,27 @@ public class MinitouchController {
         send(cmd);
     }
 
+    /**
+     * MỚI: vuốt qua NHIỀU điểm (pts[0] = điểm chạm xuống, các điểm sau là MOVE), mỗi bước chờ stepMs.
+     * Thay cho swipe() cũ vốn chỉ có đúng 1 MOVE trong ~10ms (nhảy vài trăm px trong chưa tới 1 khung hình).
+     */
+    public static void swipePath(int[][] pts, int stepMs) {
+        if (pts == null || pts.length < 2) return;
+        if (!ready) {
+            maybeRestart();
+            return;
+        }
+        int wait = Math.max(stepMs, 1);
+        StringBuilder sb = new StringBuilder(96 + pts.length * 40);
+        sb.append("d 0 ").append(pts[0][0]).append(' ').append(pts[0][1]).append(" 50\nc\n");
+        for (int i = 1; i < pts.length; i++) {
+            sb.append("w ").append(wait).append('\n');
+            sb.append("m 0 ").append(pts[i][0]).append(' ').append(pts[i][1]).append(" 50\nc\n");
+        }
+        sb.append("w ").append(wait).append("\nu 0\nc\n");
+        send(sb.toString());
+    }
+
     private static void send(String cmd) {
         synchronized (LOCK) {
             if (maaStdin == null) return;
@@ -242,6 +280,11 @@ public class MinitouchController {
                 ready = false;
             }
         }
+    }
+
+    /** MỚI: cho phép nơi khác nhờ khởi động lại MaaTouch (có giãn cách 5s). */
+    public static void ensureStarted() {
+        if (!ready) maybeRestart();
     }
 
     private static void maybeRestart() {
