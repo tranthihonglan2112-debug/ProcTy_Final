@@ -48,14 +48,14 @@ public class FloatingService extends Service {
     private static final String TAG_ERROR = "ProcTyError";
 
     private static final boolean REQUIRE_LANDSCAPE = true;
-    private static final long MIN_SWIPE_INTERVAL_MS = 50; 
+    private static final long MIN_SWIPE_INTERVAL_MS = 30; 
 
     private static final int SWIPE_START_X = 1299;      
     private static final int SWIPE_START_Y = 360;
     private static final double DEAD_ZONE_PX = 6.0;     
     private static final double DAMP = 1.0;             // MỚI: Kéo sát 100% vào tâm
     private static final double MAX_DRAG_PX = 450.0;
-    private static final int SWIPE_STEPS = 5;           
+    private static final int SWIPE_STEPS = 3;           
     private static final int SWIPE_STEP_MS = 8;         
     private static final int CAL_DRAG_PX = 40;          
     private static final int CAL_REPEATS = 3;           
