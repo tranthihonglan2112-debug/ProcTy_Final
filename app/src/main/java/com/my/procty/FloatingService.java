@@ -51,17 +51,17 @@ public class FloatingService extends Service {
     private static final String TAG_ERROR = "ProcTyError";
 
     private static final boolean REQUIRE_LANDSCAPE = true;
-    private static final long MIN_SWIPE_INTERVAL_MS = 200; 
+    private static final long MIN_SWIPE_INTERVAL_MS = 100; 
 
     // ---- MỚI: vuốt TƯƠNG ĐỐI có hiệu chuẩn (thay cho "kéo tới toạ độ tuyệt đối của mục tiêu") ----
     private static final int SWIPE_START_X = 1299;      // giữ nguyên điểm đầu cũ
     private static final int SWIPE_START_Y = 360;
     private static final double DEAD_ZONE_PX = 6.0;     // mục tiêu đã sát tâm thì KHÔNG vuốt
-    private static final double DAMP = 0.8;             // sửa 80% mỗi nhịp, tránh vọt lố khi g ước lượng lệch
+    private static final double DAMP = 0.95;
     private static final double MAX_DRAG_PX = 450.0;
     private static final int SWIPE_STEPS = 5;           // 5 điểm MOVE thay vì 1
     private static final int SWIPE_STEP_MS = 8;         // tổng ~50ms
-    private static final int CONFIRM_PX = 40;           // 2 lần quét liên tiếp phải cùng chỗ (±40px) mới vuốt
+    private static final int CONFIRM_PX = 80;
     private static final int CAL_DRAG_PX = 40;          // vuốt thử khi hiệu chuẩn
     private static final int CAL_REPEATS = 3;           // mỗi trục đo 3 lần rồi lấy trung vị
     private static final long CAL_SETTLE_MS = 450;      // chờ camera đứng yên rồi mới chụp khung B
