@@ -53,7 +53,7 @@ public class FloatingService extends Service {
     private static final int SWIPE_START_X = 1299;      
     private static final int SWIPE_START_Y = 360;
     private static final double DEAD_ZONE_PX = 6.0;     
-    private static final double DAMP = 1.0;             // MỚI: Kéo sát 100% vào tâm
+    private static final double DAMP = 1.0;             
     private static final double MAX_DRAG_PX = 450.0;
     private static final int SWIPE_STEPS = 3;           
     private static final int SWIPE_STEP_MS = 8;         
@@ -61,7 +61,6 @@ public class FloatingService extends Service {
     private static final int CAL_REPEATS = 3;           
     private static final long CAL_SETTLE_MS = 450;      
 
-    // MỚI: Tọa độ tâm súng FF ước lượng từ ảnh
     private static final int FF_CROSSHAIR_X = 745;
     private static final int FF_CROSSHAIR_Y = 360;
 
@@ -69,8 +68,8 @@ public class FloatingService extends Service {
 
     private WindowManager windowManager;
     private View roiView;
-    private View debugDotView; // Chấm đỏ (địch)
-    private View debugCenterView; // Chấm vàng (tâm khung xanh)
+    private View debugDotView; 
+    private View debugCenterView; 
     
     private DisplayManager displayManager;
     private MediaProjection mediaProjection;
@@ -285,7 +284,6 @@ public class FloatingService extends Service {
             );
             params.gravity = Gravity.TOP | Gravity.LEFT;
             
-            // MỚI: Đặt khung xanh sao cho tâm của nó trùng với tâm súng FF (745, 360)
             params.x = FF_CROSSHAIR_X - (roiBoxSize / 2); 
             params.y = FF_CROSSHAIR_Y - (roiBoxSize / 2);
 
@@ -321,7 +319,7 @@ public class FloatingService extends Service {
                 debugCenterView = new View(this);
                 GradientDrawable circle = new GradientDrawable();
                 circle.setShape(GradientDrawable.OVAL); 
-                circle.setColor(0xFFFFFF00); // Màu vàng
+                circle.setColor(0xFFFFFF00); 
                 circle.setStroke(2, 0xFF000000); 
                 debugCenterView.setBackground(circle);
 
@@ -351,7 +349,7 @@ public class FloatingService extends Service {
                 debugDotView = new View(this);
                 GradientDrawable circle = new GradientDrawable();
                 circle.setShape(GradientDrawable.OVAL); 
-                circle.setColor(0xFFFF0000); // Màu đỏ
+                circle.setColor(0xFFFF0000); 
                 circle.setStroke(3, 0xFFFFFFFF); 
                 debugDotView.setBackground(circle);
 
@@ -457,20 +455,26 @@ public class FloatingService extends Service {
                 int deltaY = (int) (result & 0xFFFFFFFFL) - 2000;
                 double dist = Math.hypot(deltaX, deltaY);
 
-                int targetX = roiRealX + (roiBoxSize / 2) + deltaX;
-                int targetY = roiRealY + (roiBoxSize / 2) + deltaY;
+                // MỚI: Vì C++ đã trả về toạ độ "Neo" (mắt địch) so với tâm ROI, 
+                // nên Java chỉ cần cộng trực tiếp với toạ độ gốc của ROI (roiRealX, roiRealY)
+                int targetX = roiRealX + deltaX;
+                int targetY = roiRealY + deltaY;
 
                 // GỌI HÀM VẼ CHẤM ĐỎ DEBUG Ở ĐÂY
                 showDebugDot(targetX, targetY); 
 
                 long now = SystemClock.uptimeMillis();
                 
-                // MỚI: Đã bỏ hoàn toàn biến 'confirmed', chỉ cần khoảng cách đủ lớn và hết thời gian chờ là vuốt
                 if (dist >= DEAD_ZONE_PX && now - lastSwipeUptime >= MIN_SWIPE_INTERVAL_MS) {
                     lastSwipeUptime = now;
-                    int[] end = AimMath.relativeEnd(SWIPE_START_X, SWIPE_START_Y, deltaX, deltaY,
+                    // Trong AimMath, deltaX/Y cần được hiểu là độ lệch so với tâm súng. 
+                    // Vì targetX/Y đã là toạ độ tuyệt đối của mắt địch, ta cần tính delta so với tâm súng (FF_CROSSHAIR)
+                    int relativeDeltaX = targetX - FF_CROSSHAIR_X;
+                    int relativeDeltaY = targetY - FF_CROSSHAIR_Y;
+
+                    int[] end = AimMath.relativeEnd(SWIPE_START_X, SWIPE_START_Y, relativeDeltaX, relativeDeltaY,
                             aimGx, aimGy, DAMP, MAX_DRAG_PX, imgW, imgH);
-                    Log.d("ProcTyTarget", "delta=(" + deltaX + "," + deltaY + ") g=(" + aimGx + "," + aimGy
+                    Log.d("ProcTyTarget", "target=(" + targetX + "," + targetY + ") g=(" + aimGx + "," + aimGy
                             + ") -> vuốt " + SWIPE_START_X + "," + SWIPE_START_Y + " => " + end[0] + "," + end[1]);
                     MinitouchController.swipePath(
                             AimMath.easedPath(SWIPE_START_X, SWIPE_START_Y, end[0], end[1], SWIPE_STEPS), SWIPE_STEP_MS);
@@ -625,7 +629,6 @@ public class FloatingService extends Service {
             roiView = null;
         }
 
-        // XÓA CHẤM ĐỎ VÀ CHẤM VÀNG KHI TẮT
         if (debugDotView != null && windowManager != null) {
             try { windowManager.removeView(debugDotView); } catch (Exception ignored) {}
             debugDotView = null;
