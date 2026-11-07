@@ -53,21 +53,24 @@ public class FloatingService extends Service {
     private static final int SWIPE_START_X = 1299;      
     private static final int SWIPE_START_Y = 360;
     private static final double DEAD_ZONE_PX = 6.0;     
-    private static final double DAMP = 0.95;             
+    private static final double DAMP = 1.0;             // MỚI: Kéo sát 100% vào tâm
     private static final double MAX_DRAG_PX = 450.0;
     private static final int SWIPE_STEPS = 5;           
     private static final int SWIPE_STEP_MS = 8;         
-    private static final int CONFIRM_PX = 100;           
     private static final int CAL_DRAG_PX = 40;          
     private static final int CAL_REPEATS = 3;           
     private static final long CAL_SETTLE_MS = 450;      
+
+    // MỚI: Tọa độ tâm súng FF ước lượng từ ảnh
+    private static final int FF_CROSSHAIR_X = 745;
+    private static final int FF_CROSSHAIR_Y = 360;
 
     private static boolean crashHandlerInstalled = false;
 
     private WindowManager windowManager;
     private View roiView;
     private View debugDotView; // Chấm đỏ (địch)
-    private View debugCenterView; // MỚI: Chấm vàng (tâm khung xanh)
+    private View debugCenterView; // Chấm vàng (tâm khung xanh)
     
     private DisplayManager displayManager;
     private MediaProjection mediaProjection;
@@ -99,7 +102,6 @@ public class FloatingService extends Service {
     private final double[] calG = new double[CAL_REPEATS];
     private int calGn = 0;
     private boolean maaRestartTried = false;
-    private int lastDx = Integer.MIN_VALUE, lastDy = 0;     
     private long scanNs = 0;
     private int scanN = 0;
     private int lastLoadedMode = -1;
@@ -283,8 +285,9 @@ public class FloatingService extends Service {
             );
             params.gravity = Gravity.TOP | Gravity.LEFT;
             
-            params.x = (screenW / 2) - (roiBoxSize / 2) - 30; 
-            params.y = (screenH / 2) - (roiBoxSize / 2);
+            // MỚI: Đặt khung xanh sao cho tâm của nó trùng với tâm súng FF (745, 360)
+            params.x = FF_CROSSHAIR_X - (roiBoxSize / 2); 
+            params.y = FF_CROSSHAIR_Y - (roiBoxSize / 2);
 
             roiRealX = params.x;
             roiRealY = params.y;
@@ -302,7 +305,6 @@ public class FloatingService extends Service {
                     roiRealX = loc[0];
                     roiRealY = loc[1];
 
-                    // MỚI: Vẽ chấm vàng ở tâm khung xanh
                     showDebugCenter(roiRealX + (roiBoxSize / 2), roiRealY + (roiBoxSize / 2));
                 } catch (Exception e) {
                     Log.e(TAG_ERROR, "Không lấy được vị trí ROI thật: " + e);
@@ -313,7 +315,6 @@ public class FloatingService extends Service {
         }
     }
 
-    // MỚI: Hàm vẽ chấm vàng ở tâm khung xanh
     private void showDebugCenter(int x, int y) {
         try {
             if (debugCenterView == null) {
@@ -328,7 +329,7 @@ public class FloatingService extends Service {
                         WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY : WindowManager.LayoutParams.TYPE_PHONE;
 
                 WindowManager.LayoutParams params = new WindowManager.LayoutParams(
-                        16, 16, // Kích thước chấm vàng
+                        16, 16, 
                         type, WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
                         PixelFormat.TRANSLUCENT
                 );
@@ -456,11 +457,6 @@ public class FloatingService extends Service {
                 int deltaY = (int) (result & 0xFFFFFFFFL) - 2000;
                 double dist = Math.hypot(deltaX, deltaY);
 
-                boolean confirmed = lastDx != Integer.MIN_VALUE
-                        && Math.abs(deltaX - lastDx) <= CONFIRM_PX && Math.abs(deltaY - lastDy) <= CONFIRM_PX;
-                lastDx = deltaX;
-                lastDy = deltaY;
-
                 int targetX = roiRealX + (roiBoxSize / 2) + deltaX;
                 int targetY = roiRealY + (roiBoxSize / 2) + deltaY;
 
@@ -468,7 +464,9 @@ public class FloatingService extends Service {
                 showDebugDot(targetX, targetY); 
 
                 long now = SystemClock.uptimeMillis();
-                if (confirmed && dist >= DEAD_ZONE_PX && now - lastSwipeUptime >= MIN_SWIPE_INTERVAL_MS) {
+                
+                // MỚI: Đã bỏ hoàn toàn biến 'confirmed', chỉ cần khoảng cách đủ lớn và hết thời gian chờ là vuốt
+                if (dist >= DEAD_ZONE_PX && now - lastSwipeUptime >= MIN_SWIPE_INTERVAL_MS) {
                     lastSwipeUptime = now;
                     int[] end = AimMath.relativeEnd(SWIPE_START_X, SWIPE_START_Y, deltaX, deltaY,
                             aimGx, aimGy, DAMP, MAX_DRAG_PX, imgW, imgH);
@@ -476,10 +474,7 @@ public class FloatingService extends Service {
                             + ") -> vuốt " + SWIPE_START_X + "," + SWIPE_START_Y + " => " + end[0] + "," + end[1]);
                     MinitouchController.swipePath(
                             AimMath.easedPath(SWIPE_START_X, SWIPE_START_Y, end[0], end[1], SWIPE_STEPS), SWIPE_STEP_MS);
-                    lastDx = Integer.MIN_VALUE;       
                 }
-            } else {
-                lastDx = Integer.MIN_VALUE;           
             }
         } catch (Exception e) {
             Log.e(TAG_ERROR, "Lỗi frame: " + e, e);
