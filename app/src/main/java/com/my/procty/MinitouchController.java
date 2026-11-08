@@ -266,6 +266,8 @@ public class MinitouchController {
             sb.append("m 0 ").append(pts[i][0]).append(' ').append(pts[i][1]).append(" 50\nc\n");
         }
         sb.append("w ").append(wait).append("\nu 0\nc\n");
+        Log.d(TAG, "swipePath: gui " + pts.length + " diem, " + (pts.length - 1) + " lenh m, wait=" + wait
+                + "ms, cmd=" + pts.length * 2 + " dong -> " + sb.toString().replace("\n", "|"));
         send(sb.toString());
     }
 

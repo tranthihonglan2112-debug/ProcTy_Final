@@ -58,8 +58,10 @@ public class FloatingService extends Service {
     private static final double MAX_DRAG_PX = 450.0;
     // Cử chỉ phải kéo dài >= 3-4 khung hình game (~60ms). Bản cũ 2 bước x 8ms = ~24ms: DOWN/MOVE/UP
     // dồn vào 1-2 khung -> game đọc delta theo khung sẽ nuốt mất MOVE => "rất ít khi vuốt / giật".
-    private static final int SWIPE_STEPS = 5;
-    private static final int SWIPE_STEP_MS = 10;
+    private static final int SWIPE_STEPS = 8;    // d + 7 MOVE + u
+    // 16ms/buoc: moi MOVE roi vao DUNG 1 khung vsync (16.7ms) rieng -> khong bi gop batch.
+    // Tong ~128ms >= 7-8 khung game @60fps (code cu 5 x 10ms = 50ms ~ 3 khung -> bi gop con 2-3 nac).
+    private static final int SWIPE_STEP_MS = 16;
     // Không gửi cử chỉ mới khi cử chỉ trước chưa xong (tránh xếp hàng lệnh cũ trong stdin MaaTouch).
     private static final long MIN_SWIPE_INTERVAL_MS = (SWIPE_STEPS + 1) * SWIPE_STEP_MS + 20;
 
@@ -129,6 +131,18 @@ public class FloatingService extends Service {
     private long scanNs = 0;
     private int scanN = 0;
     private int lastLoadedMode = -1;
+
+    // ===== MAY DEM CHUNG MINH: tai sao khong vuot? =====
+    private long gFrameSkip, gCalBusy, gNoDetect, gDeadZone, gThrottle, gTooSmall, gSwiped;
+    private void logGates() {
+        Log.d("ProcTyGate", "frames: bo_qua_6=" + gFrameSkip
+                + " | calibration_chiem=" + gCalBusy
+                + " | khong_nhan_dien=" + gNoDetect
+                + " | deadzone<3px=" + gDeadZone
+                + " | throttle_80ms=" + gThrottle
+                + " | vuot<2px=" + gTooSmall
+                + " | DA_VUOT=" + gSwiped);
+    }
 
     @Override
     public IBinder onBind(Intent intent) {
@@ -446,7 +460,7 @@ public class FloatingService extends Service {
             boolean portrait = imgW < imgH;
 
             frameCount++;
-            if (frameCount % 6 != 0) return;
+            if (frameCount % 6 != 0) { gFrameSkip++; return; }
 
             isScanning = prefs.getBoolean("is_scanning", false);
             int mode = prefs.getInt("mode", 1);
@@ -474,7 +488,7 @@ public class FloatingService extends Service {
                 return;
             }
 
-            if (calibrateStep(buffer, imgW, imgH, rowStride)) return;
+            if (calibrateStep(buffer, imgW, imgH, rowStride)) { gCalBusy++; if (gCalBusy % 30 == 1) logGates(); return; }
 
             if (mode == 2) {
                 if (lastLoadedMode != 2 || cachedTemplateData == null) {
@@ -512,6 +526,7 @@ public class FloatingService extends Service {
                 scanNs = 0;
             }
 
+            if (result == 0) gNoDetect++;
             int[] delta = AnchorMath.decodeDelta(result);
             if (delta != null) {
                 final int deltaX = delta[0];   // Neo - TÂM ROI (do C++ trả về)
@@ -533,12 +548,18 @@ public class FloatingService extends Service {
 
                 long now = SystemClock.uptimeMillis();
 
-                if (dist >= DEAD_ZONE_PX && now - lastSwipeUptime >= MIN_SWIPE_INTERVAL_MS) {
-                    lastSwipeUptime = now;
-
+                if (dist < DEAD_ZONE_PX) { gDeadZone++; if (gDeadZone % 30 == 1) logGates(); }
+                else if (now - lastSwipeUptime < MIN_SWIPE_INTERVAL_MS) { gThrottle++; if (gThrottle % 30 == 1) logGates(); }
+                else {
                     int[] end = AimMath.relativeEnd(SWIPE_START_X, SWIPE_START_Y, relativeDeltaX, relativeDeltaY,
                             aimGx, aimGy, gTrusted ? DAMP : FALLBACK_DAMP, MAX_DRAG_PX, imgW, imgH);
-                    if (Math.abs(end[0] - SWIPE_START_X) + Math.abs(end[1] - SWIPE_START_Y) < 2) return;   // vuốt 0-1px = vô ích
+                    if (Math.abs(end[0] - SWIPE_START_X) + Math.abs(end[1] - SWIPE_START_Y) < 2) {
+                        gTooSmall++;                                   // vuốt 0-1px = vô ích
+                        if (gTooSmall % 30 == 1) logGates();
+                        return;                                        // KHONG dot lastSwipeUptime o day (sua bug chock 80ms)
+                    }
+                    lastSwipeUptime = now;                             // chi chot gio khi thuc su vuot
+                    gSwiped++;
                     Log.d("ProcTyTarget", "roi=(" + roiX + "," + roiY + " " + roiW + "x" + roiH + ")"
                             + " delta=(" + deltaX + "," + deltaY + ")"
                             + " target=(" + targetX + "," + targetY + ")"
