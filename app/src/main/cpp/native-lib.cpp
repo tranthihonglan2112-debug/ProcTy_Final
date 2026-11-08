@@ -71,7 +71,7 @@ static inline double parabolaPeak(float l, float c, float r) {
 // HỢP ĐỒNG TOẠ ĐỘ C++ <-> Java (nativeFindTarget):
 //   delta = (điểm Neo) - (TÂM ROI), đơn vị px màn hình thật, gốc toạ độ = góc trên-trái ROI.
 //   TÂM ROI = (roiW / 2, roiH / 2)  -> trên màn hình là (roiX + roiW/2, roiY + roiH/2).
-//   Java PHẢI cộng delta vào TÂM ROI (AnchorMath.toScreen), KHÔNG được cộng vào góc ROI.
+//   Java PHẢI cộng delta vào TÂM ROI (AnchorMath.toScreen), KHÔNG được cộng vào góc ROI
 static inline jlong packDelta(int dx, int dy) {
     uint32_t uX = (uint32_t) (dx + 2000);
     uint32_t uY = (uint32_t) (dy + 2000);
