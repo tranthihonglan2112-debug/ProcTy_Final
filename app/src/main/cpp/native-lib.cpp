@@ -39,8 +39,8 @@ static const int MIN_TPL_PX = 8;
 static const double COLOR_MIN_CORREL = 0.5;
 
 // Toạ độ "Neo" (Anchor) tính theo tỉ lệ của ảnh mẫu: 50% chiều rộng, 40% chiều cao.
-static const double ANCHOR_X_RATIO = 0.50;
-static const double ANCHOR_Y_RATIO = 0.40;
+static const double ANCHOR_X_RATIO = 0.45;
+static const double ANCHOR_Y_RATIO = 0.60;
 
 static cv::Mat colorHist(const cv::Mat &rgb, const cv::Mat &mask) {
     cv::Mat hsv, hist;
