@@ -63,7 +63,7 @@ public class FloatingService extends Service {
     private static final int CAL_REPEATS = 3;           
     private static final long CAL_SETTLE_MS = 450;      
 
-    private static final int FF_CROSSHAIR_X = 765;
+    private static final int FF_CROSSHAIR_X = 785;
     private static final int FF_CROSSHAIR_Y = 360;
 
     private static boolean crashHandlerInstalled = false;
