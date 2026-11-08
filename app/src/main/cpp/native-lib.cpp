@@ -310,30 +310,49 @@ Java_com_my_procty_FloatingService_nativeCalibStore(JNIEnv *env, jobject /*thiz*
     return JNI_TRUE;
 }
 
+// ---------------------------------------------------------------------------
+// ĐO DỊCH CHUYỂN CẢNH (hiệu chuẩn g) - bản vá:
+//  * Chỉ dùng VÙNG GIỮA màn hình: HUD (joystick, nút bắn, minimap, thanh vũ khí) ở rìa là vật ĐỨNG YÊN,
+//    cho đỉnh phase-correlation ở (0,0) rất mạnh -> kéo trung vị về 0 -> g < 0.05 -> bị loại.
+//  * Tile có dịch chuyển ~0 trên trục đang đo = HUD/nhân vật đứng yên -> BỎ, không cho vào trung vị.
+//  * Ngưỡng response hạ xuống 0.03 (cảnh 3D thật hiếm khi vượt 0.05) + đồng thuận >= 2 tile.
+//  axis: 0 = X, 1 = Y. Trả (1<<32) | (llround(shift_px_thật*10) + 200000), hoặc 0 nếu không tin cậy.
+// ---------------------------------------------------------------------------
+static const double CALIB_MIN_RESP  = 0.03;
+static const double CALIB_STATIC_PX = 0.4;   // px ở nửa độ phân giải
+
 extern "C" JNIEXPORT jlong JNICALL
-Java_com_my_procty_FloatingService_nativeCalibShift(JNIEnv * /*env*/, jobject /*thiz*/) {
+Java_com_my_procty_FloatingService_nativeCalibShift(JNIEnv * /*env*/, jobject /*thiz*/, jint axis) {
     const cv::Mat &a = g_calib[0], &b = g_calib[1];
     if (a.empty() || b.empty() || a.size() != b.size()) return 0;
+    const int x0 = a.cols * 20 / 100, x1 = a.cols * 80 / 100;
+    const int y0 = a.rows * 12 / 100, y1 = a.rows * 88 / 100;
     const int tilesX = 3, tilesY = 2;
-    const int tw = a.cols / tilesX, th = a.rows / tilesY;
+    const int tw = (x1 - x0) / tilesX, th = (y1 - y0) / tilesY;
     if (tw < 64 || th < 64) return 0;
     cv::Mat win;
     cv::createHanningWindow(win, cv::Size(tw, th), CV_32F);
-    std::vector<double> xs, ys;
+
+    std::vector<double> v;
     for (int ty = 0; ty < tilesY; ty++) {
         for (int tx = 0; tx < tilesX; tx++) {
-            cv::Rect r(tx * tw, ty * th, tw, th);
+            cv::Rect r(x0 + tx * tw, y0 + ty * th, tw, th);
             double resp = 0.0;
             cv::Point2d sh = cv::phaseCorrelate(a(r), b(r), win, &resp);
-            if (resp > 0.05) { xs.push_back(sh.x); ys.push_back(sh.y); }
+            double s = (axis == 0) ? sh.x : sh.y;
+            if (resp < CALIB_MIN_RESP) continue;            // tile phẳng / nhiễu
+            if (std::fabs(s) < CALIB_STATIC_PX) continue;   // vật đứng yên (HUD, nhân vật)
+            v.push_back(s);
         }
     }
-    if (xs.size() < 3) return 0;                       
-    std::sort(xs.begin(), xs.end());
-    std::sort(ys.begin(), ys.end());
-    double sx = xs[xs.size() / 2] * 2.0;               
-    double sy = ys[ys.size() / 2] * 2.0;
-    jlong px = (jlong) std::llround(sx * 10.0) + 200000;
-    jlong py = (jlong) std::llround(sy * 10.0) + 200000;
-    return (px << 32) | py;
+    if (v.size() < 2) { LOGD("calib axis=%d: chỉ %d tile hợp lệ (<2)", (int) axis, (int) v.size()); return 0; }
+    std::sort(v.begin(), v.end());
+    const double med = v[v.size() / 2];
+    const double tol = std::max(1.5, 0.25 * std::fabs(med));
+    std::vector<double> in;
+    for (double s : v) if (std::fabs(s - med) <= tol) in.push_back(s);
+    if (in.size() < 2) { LOGD("calib axis=%d: các tile không đồng thuận (trung vị=%.2f)", (int) axis, med); return 0; }
+    const double sceneShift = in[in.size() / 2] * 2.0;      // nửa độ phân giải -> px thật
+    LOGD("calib axis=%d: %d/%d tile đồng thuận, dịch cảnh=%.1f px", (int) axis, (int) in.size(), (int) v.size(), sceneShift);
+    return (((jlong) 1) << 32) | (jlong) (std::llround(sceneShift * 10.0) + 200000);
 }

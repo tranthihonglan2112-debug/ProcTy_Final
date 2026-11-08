@@ -304,6 +304,9 @@ public class MinitouchController {
             maaStdin = null;
         }
         try {
+            // Nhả ngón tay trước khi đóng: close() giữa chừng một cử chỉ (xoay màn hình / khởi động lại)
+            // sẽ để ngón tay "kẹt" ở trạng thái DOWN cho tới khi process chết.
+            if (os != null) { try { os.write("u 0\nc\n".getBytes(StandardCharsets.UTF_8)); os.flush(); } catch (IOException ignored) {} }
             if (os != null) os.close(); // stdin EOF => MaaTouch tự thoát
         } catch (IOException ignored) {
         }

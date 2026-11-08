@@ -41,7 +41,7 @@ public class FloatingService extends Service {
 
     private native boolean nativeLoadTemplate(byte[] templateData);
     private native boolean nativeCalibStore(ByteBuffer buffer, int fullW, int fullH, int rowStride, int slot);
-    private native long nativeCalibShift();
+    private native long nativeCalibShift(int axis);
     private native long nativeFindTarget(ByteBuffer buffer, int fullW, int fullH, int rowStride,
                                          int roiX, int roiY, int roiW, int roiH,
                                          int mode, int cR, int cG, int cB);
@@ -50,18 +50,30 @@ public class FloatingService extends Service {
     private static final String TAG_ERROR = "ProcTyError";
 
     private static final boolean REQUIRE_LANDSCAPE = true;
-    private static final long MIN_SWIPE_INTERVAL_MS = 30; 
 
     private static final int SWIPE_START_X = 1299;      
     private static final int SWIPE_START_Y = 360;
-    private static final double DEAD_ZONE_PX = 0.0;     
-    private static final double DAMP = 1.0;             
+    private static final double DEAD_ZONE_PX = 3.0;     // <3px: neo đã trùng tâm, vuốt thêm chỉ gây giật
+    private static final double DAMP = 1.0;
     private static final double MAX_DRAG_PX = 450.0;
-    private static final int SWIPE_STEPS = 2;           
-    private static final int SWIPE_STEP_MS = 8;         
-    private static final int CAL_DRAG_PX = 40;          
-    private static final int CAL_REPEATS = 3;           
-    private static final long CAL_SETTLE_MS = 450;      
+    // Cử chỉ phải kéo dài >= 3-4 khung hình game (~60ms). Bản cũ 2 bước x 8ms = ~24ms: DOWN/MOVE/UP
+    // dồn vào 1-2 khung -> game đọc delta theo khung sẽ nuốt mất MOVE => "rất ít khi vuốt / giật".
+    private static final int SWIPE_STEPS = 5;
+    private static final int SWIPE_STEP_MS = 10;
+    // Không gửi cử chỉ mới khi cử chỉ trước chưa xong (tránh xếp hàng lệnh cũ trong stdin MaaTouch).
+    private static final long MIN_SWIPE_INTERVAL_MS = (SWIPE_STEPS + 1) * SWIPE_STEP_MS + 20;
+
+    // ---- Hiệu chuẩn ----
+    private static final int CAL_STEPS = 6;
+    private static final int CAL_STEP_MS = 14;                  // ~100ms/cử chỉ để game kịp ghi nhận
+    private static final int[] CAL_DRAGS = {60, 120, 30, 90};   // thử nhiều cỡ: quá nhỏ (<dead-zone) hoặc quá lớn (>nửa tile) đều hỏng
+    private static final int CAL_NEED_OK = 2;                   // cần 2 lần đo nhất quán / trục
+    private static final int CAL_MAX_TRIES = CAL_DRAGS.length;
+    private static final long CAL_SETTLE_MS = 600;
+    // FALLBACK khi đo hỏng. g LỚN = vuốt NGẮN -> sai thì chỉ hội tụ chậm, KHÔNG dao động/giật.
+    // (g quá nhỏ mới gây vượt đích rồi giật qua lại). Tinh chỉnh theo log ProcTyTarget.
+    private static final double FALLBACK_G = 2.0;
+    private static final double FALLBACK_DAMP = 0.8;
 
     private static final int FF_CROSSHAIR_X = 800;
     private static final int FF_CROSSHAIR_Y = 360;
@@ -108,9 +120,10 @@ public class FloatingService extends Service {
     private byte[] cachedTemplateData = null;
 
     private double aimGx = 0, aimGy = 0;
-    private int calStep = 0, calPhase = 0, calSign = 1, calFail = 0;
+    private int calAxis = 0, calTry = 0, calPhase = 0, calSign = 1, calDrag = 0;
+    private boolean calOkX = false, gTrusted = false;
     private long calReadyAt = 0;
-    private final double[] calG = new double[CAL_REPEATS];
+    private final double[] calG = new double[CAL_MAX_TRIES];
     private int calGn = 0;
     private boolean maaRestartTried = false;
     private long scanNs = 0;
@@ -129,6 +142,7 @@ public class FloatingService extends Service {
         prefs = getSharedPreferences("proc_ty_settings", MODE_PRIVATE);
         aimGx = prefs.getFloat("aim_gx", 0f);
         aimGy = prefs.getFloat("aim_gy", 0f);
+        gTrusted = aimGx != 0 && aimGy != 0;
         windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
 
         try {
@@ -523,12 +537,13 @@ public class FloatingService extends Service {
                     lastSwipeUptime = now;
 
                     int[] end = AimMath.relativeEnd(SWIPE_START_X, SWIPE_START_Y, relativeDeltaX, relativeDeltaY,
-                            aimGx, aimGy, DAMP, MAX_DRAG_PX, imgW, imgH);
+                            aimGx, aimGy, gTrusted ? DAMP : FALLBACK_DAMP, MAX_DRAG_PX, imgW, imgH);
+                    if (Math.abs(end[0] - SWIPE_START_X) + Math.abs(end[1] - SWIPE_START_Y) < 2) return;   // vuốt 0-1px = vô ích
                     Log.d("ProcTyTarget", "roi=(" + roiX + "," + roiY + " " + roiW + "x" + roiH + ")"
                             + " delta=(" + deltaX + "," + deltaY + ")"
                             + " target=(" + targetX + "," + targetY + ")"
                             + " rel=(" + relativeDeltaX + "," + relativeDeltaY + ")"
-                            + " g=(" + aimGx + "," + aimGy + ")"
+                            + " g=(" + aimGx + "," + aimGy + (gTrusted ? ")" : ")[DỰ PHÒNG]")
                             + " -> vuốt " + SWIPE_START_X + "," + SWIPE_START_Y + " => " + end[0] + "," + end[1]);
                     MinitouchController.swipePath(
                             AimMath.easedPath(SWIPE_START_X, SWIPE_START_Y, end[0], end[1], SWIPE_STEPS), SWIPE_STEP_MS);
@@ -549,12 +564,13 @@ public class FloatingService extends Service {
         }
 
         long now = SystemClock.uptimeMillis();
-        boolean horizontal = calStep < CAL_REPEATS;
+        boolean horizontal = (calAxis == 0);
 
         if (calPhase == 0) {
-            if (calStep == 0) {
+            if (calAxis == 0 && calTry == 0) {
                 int mx = MinitouchController.getMaxX(), my = MinitouchController.getMaxY();
-                if (mx > 0 && (mx != imgW || my != imgH)) {
+                // minitouch báo max = kích thước-1 trên một số máy -> cho phép lệch 1px
+                if (mx > 0 && (Math.abs(mx - imgW) > 1 || Math.abs(my - imgH) > 1)) {
                     Log.e(TAG_ERROR, "MaaTouch dùng toạ độ " + mx + "x" + my + " nhưng khung chụp là " + imgW + "x" + imgH
                             + " => toạ độ vuốt sẽ SAI. " + (maaRestartTried ? "Đã khởi động lại 1 lần mà vẫn lệch." : "Khởi động lại MaaTouch."));
                     if (!maaRestartTried) {
@@ -566,10 +582,11 @@ public class FloatingService extends Service {
                 }
             }
             if (!nativeCalibStore(buffer, imgW, imgH, rowStride, 0)) return true;
-            calSign = ((calStep % 2) == 0) ? 1 : -1;       
-            int ex = SWIPE_START_X + (horizontal ? calSign * CAL_DRAG_PX : 0);
-            int ey = SWIPE_START_Y + (horizontal ? 0 : calSign * CAL_DRAG_PX);
-            MinitouchController.swipePath(AimMath.easedPath(SWIPE_START_X, SWIPE_START_Y, ex, ey, SWIPE_STEPS), SWIPE_STEP_MS);
+            calSign = ((calTry % 2) == 0) ? 1 : -1;               // +, -, +, - : cảnh quay về gần chỗ cũ
+            calDrag = CAL_DRAGS[calTry % CAL_DRAGS.length];
+            int ex = SWIPE_START_X + (horizontal ? calSign * calDrag : 0);
+            int ey = SWIPE_START_Y + (horizontal ? 0 : calSign * calDrag);
+            MinitouchController.swipePath(AimMath.easedPath(SWIPE_START_X, SWIPE_START_Y, ex, ey, CAL_STEPS), CAL_STEP_MS);
             calReadyAt = now + CAL_SETTLE_MS;
             calPhase = 1;
             return true;
@@ -578,36 +595,51 @@ public class FloatingService extends Service {
         if (now < calReadyAt) return true;
         calPhase = 0;
         if (!nativeCalibStore(buffer, imgW, imgH, rowStride, 1)) return true;
-        long r = nativeCalibShift();
+        long r = nativeCalibShift(calAxis);
 
         double g = Double.NaN;
         if (r != 0) {
-            double sx = ((int) (r >> 32) - 200000) / 10.0;
-            double sy = ((int) (r & 0xFFFFFFFFL) - 200000) / 10.0;
-            g = AimMath.gainFromShift(horizontal ? sx : sy, calSign * (double) CAL_DRAG_PX);
-            Log.d("ProcTyCal", (horizontal ? "X" : "Y") + " lần " + (calStep % CAL_REPEATS + 1)
-                    + ": cảnh dịch (" + sx + "," + sy + ") px => g=" + g);
+            double sceneShift = ((int) (r & 0xFFFFFFFFL) - 200000) / 10.0;
+            g = AimMath.gainFromShift(sceneShift, calSign * (double) calDrag);
+            Log.d("ProcTyCal", (horizontal ? "X" : "Y") + " lần " + (calTry + 1) + " drag=" + (calSign * calDrag)
+                    + ": cảnh dịch " + sceneShift + " px => g=" + g);
         } else {
-            Log.w("ProcTyCal", "không đo được dịch chuyển (cảnh quá phẳng/ít chi tiết?)");
+            Log.w("ProcTyCal", (horizontal ? "X" : "Y") + " lần " + (calTry + 1) + " drag=" + (calSign * calDrag)
+                    + ": không đo được (xem log ProcTyNative)");
         }
-        if (!Double.isNaN(g)) calG[calGn++] = g; else calFail++;
+        if (!Double.isNaN(g)) calG[calGn++] = g;
+        calTry++;
 
-        boolean groupDone = ((calStep + 1) % CAL_REPEATS) == 0;
-        calStep++;
-        if (groupDone) {
-            double med = (calGn >= 2) ? AimMath.median(calG, calGn) : Double.NaN;
+        // Nhất quán: >=2 lần đo cùng dấu, max/min <= 1.6
+        boolean agree = false;
+        if (calGn >= CAL_NEED_OK) {
+            double mn = Double.MAX_VALUE, mx = 0;
+            boolean sameSign = true;
+            for (int k = 0; k < calGn; k++) {
+                mn = Math.min(mn, Math.abs(calG[k])); mx = Math.max(mx, Math.abs(calG[k]));
+                if (Math.signum(calG[k]) != Math.signum(calG[0])) sameSign = false;
+            }
+            agree = sameSign && mx <= mn * 1.6;
+        }
+
+        if (agree || calTry >= CAL_MAX_TRIES) {
+            String ax = horizontal ? "X" : "Y";
+            double med = (calGn > 0) ? AimMath.median(calG, calGn) : Double.NaN;
             if (Double.isNaN(med)) {
-                Log.e("ProcTyCal", "Hiệu chuẩn trục " + (horizontal ? "X" : "Y") + " THẤT BẠI -> tạm dùng g=1.0 (không lưu)");
-                med = 1.0;
+                med = FALLBACK_G;
+                Log.e("ProcTyCal", "Hiệu chuẩn trục " + ax + " THẤT BẠI -> dùng g dự phòng=" + med + " (không lưu)");
+            } else if (!agree) {
+                Log.w("ProcTyCal", "Trục " + ax + " đo không nhất quán (" + calGn + " mẫu) -> dùng trung vị g=" + med + " (không lưu)");
             }
-            if (horizontal) aimGx = med; else aimGy = med;
+            if (horizontal) { aimGx = med; calOkX = agree; aimGy = 0; calAxis = 1; }
+            else {
+                aimGy = med;
+                gTrusted = calOkX && agree;
+                Log.i("ProcTyCal", "Hiệu chuẩn xong: gx=" + aimGx + " gy=" + aimGy + (gTrusted ? " (tin cậy, đã lưu)" : " (một phần dự phòng)"));
+                if (gTrusted) prefs.edit().putFloat("aim_gx", (float) aimGx).putFloat("aim_gy", (float) aimGy).apply();
+            }
             calGn = 0;
-            if (!horizontal) {
-                Log.i("ProcTyCal", "Hiệu chuẩn xong: gx=" + aimGx + " gy=" + aimGy);
-                if (calFail == 0) prefs.edit().putFloat("aim_gx", (float) aimGx).putFloat("aim_gy", (float) aimGy).apply();
-            } else {
-                aimGy = 0;   
-            }
+            calTry = 0;
         }
         return true;
     }
