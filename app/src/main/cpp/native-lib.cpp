@@ -22,6 +22,7 @@ static bool g_hasMask = false;
 static bool g_matchFailLogged = false;
 static std::vector<cv::Mat> g_tplHist;     
 static cv::Mat g_calib[2];                 
+static int g_origW = 0, g_origH = 0;       // kích thước ảnh mẫu GỐC (để tính Neo theo tỉ lệ chính xác, không dính sai số làm tròn của resize)
 
 static const double DOWNSCALE = 0.5;       
 static const double MATCH_THRESHOLD = 0.7;
@@ -38,9 +39,12 @@ static const int MIN_TPL_PX = 8;
 // Đặt -1.0 để TẮT hẳn cổng màu (HISTCMP_CORREL nằm trong [-1, 1]).
 static const double COLOR_MIN_CORREL = 0.5;
 
-// Toạ độ "Neo" (Anchor) tính theo tỉ lệ của ảnh mẫu: 50% chiều rộng, 40% chiều cao.
-static const double ANCHOR_X_RATIO = 0.45;
-static const double ANCHOR_Y_RATIO = 0.60;
+// Toạ độ "Neo" (Anchor) tính theo tỉ lệ KHUNG ẢNH MẪU (cả phần trong suốt), gốc = góc trên-trái.
+// ĐO TRỰC TIẾP trên head_front.png (74x59): điểm giữa hai mắt = (36.2px, 34.0px)
+//   => X = 36.7/74 = 0.49 ; Y = 34.5/59 = 0.585   (giá trị cũ 0.45/0.60 lệch ~3px sang mắt trái)
+// Đổi ảnh mẫu khác => đo lại hai số này (toạ độ pixel điểm muốn nhắm / kích thước ảnh).
+static const double ANCHOR_X_RATIO = 0.49;
+static const double ANCHOR_Y_RATIO = 0.585;
 
 static cv::Mat colorHist(const cv::Mat &rgb, const cv::Mat &mask) {
     cv::Mat hsv, hist;
@@ -55,6 +59,14 @@ static cv::Mat colorHist(const cv::Mat &rgb, const cv::Mat &mask) {
 }
 
 static int g_logCounter = 0;
+
+// Tinh chỉnh đỉnh tương quan về dưới-pixel (parabol 3 điểm). Trả độ lệch trong [-0.5, 0.5].
+// Ảnh khớp chạy ở NỬA độ phân giải: 1 px ở đó = 2 px thật, nên không tinh chỉnh sẽ lệch tới ±2 px.
+static inline double parabolaPeak(float l, float c, float r) {
+    double d = (double) l - 2.0 * c + r;
+    if (std::fabs(d) < 1e-9) return 0.0;
+    return std::max(-0.5, std::min(0.5, 0.5 * ((double) l - r) / d));
+}
 
 // HỢP ĐỒNG TOẠ ĐỘ C++ <-> Java (nativeFindTarget):
 //   delta = (điểm Neo) - (TÂM ROI), đơn vị px màn hình thật, gốc toạ độ = góc trên-trái ROI.
@@ -109,6 +121,8 @@ Java_com_my_procty_FloatingService_nativeLoadTemplate(JNIEnv *env, jobject /*thi
 
     cv::Mat rgb;
     cv::cvtColor(bgr, rgb, cv::COLOR_BGR2RGB);   
+    g_origW = rgb.cols;
+    g_origH = rgb.rows;
 
     bool useMask = false;
     if (!alpha.empty()) {
@@ -201,6 +215,7 @@ Java_com_my_procty_FloatingService_nativeFindTarget(JNIEnv *env, jobject /*thiz*
         double bestVal = 0.0, bestScale = 0.0;
         int bestIdx = -1;
         cv::Point bestRaw(0, 0);     // góc trên-trái ứng viên tốt nhất (toạ độ nửa độ phân giải, trong ROI)
+        double bestSubX = 0.0, bestSubY = 0.0;   // phần lẻ dưới-pixel của đỉnh
 
         for (size_t i = 0; i < g_tpls.size(); i++) {
             const cv::Mat &t = g_tpls[i];
@@ -233,6 +248,12 @@ Java_com_my_procty_FloatingService_nativeFindTarget(JNIEnv *env, jobject /*thiz*
                 bestVal = maxVal;
                 bestIdx = (int) i;
                 bestRaw = maxLoc;
+                bestSubX = (maxLoc.x > 0 && maxLoc.x < result.cols - 1)
+                        ? parabolaPeak(result.at<float>(maxLoc.y, maxLoc.x - 1), (float) maxVal,
+                                       result.at<float>(maxLoc.y, maxLoc.x + 1)) : 0.0;
+                bestSubY = (maxLoc.y > 0 && maxLoc.y < result.rows - 1)
+                        ? parabolaPeak(result.at<float>(maxLoc.y - 1, maxLoc.x), (float) maxVal,
+                                       result.at<float>(maxLoc.y + 1, maxLoc.x)) : 0.0;
                 bestScale = g_tplScales[i];
             }
         }
@@ -259,8 +280,11 @@ Java_com_my_procty_FloatingService_nativeFindTarget(JNIEnv *env, jobject /*thiz*
             }
 
             // NEO: vị trí (tỉ lệ) bên trong ảnh mẫu đã co giãn, đổi về độ phân giải thật, TRONG ROI.
-            const int anchorX = cvRound((bestRaw.x + t.cols * ANCHOR_X_RATIO) / DOWNSCALE);
-            const int anchorY = cvRound((bestRaw.y + t.rows * ANCHOR_Y_RATIO) / DOWNSCALE);
+            // Kích thước ảnh mẫu đã co giãn TÍNH CHÍNH XÁC (không dùng t.cols đã bị làm tròn).
+            const double tw = g_origW * bestScale * DOWNSCALE;
+            const double th = g_origH * bestScale * DOWNSCALE;
+            const int anchorX = cvRound((bestRaw.x + bestSubX + tw * ANCHOR_X_RATIO) / DOWNSCALE);
+            const int anchorY = cvRound((bestRaw.y + bestSubY + th * ANCHOR_Y_RATIO) / DOWNSCALE);
 
             // delta so với TÂM ROI (xem "HỢP ĐỒNG TOẠ ĐỘ" ở packDelta).
             return packDelta(anchorX - centerX, anchorY - centerY);

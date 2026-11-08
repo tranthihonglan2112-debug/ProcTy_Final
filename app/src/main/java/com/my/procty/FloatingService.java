@@ -19,12 +19,14 @@ import android.os.Build;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.IBinder;
+import android.os.Looper;
 import android.os.SystemClock;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.Display;
 import android.view.Gravity;
 import android.view.View;
+import android.view.ViewTreeObserver;
 import android.view.WindowManager;
 import androidx.core.app.NotificationCompat;
 import java.io.File;
@@ -90,8 +92,18 @@ public class FloatingService extends Service {
     private SharedPreferences prefs;
     private final int roiBoxSize = 300; 
 
-    private int roiRealX = 0;
-    private int roiRealY = 0;
+    // ===== HỆ TOẠ ĐỘ =====
+    // CAPTURE-SPACE = toạ độ pixel của ảnh MediaProjection (= toạ độ vuốt MaaTouch) = "sự thật" duy nhất.
+    // roiRealX/Y, FF_CROSSHAIR_*, targetX/Y đều là capture-space.
+    // OVERLAY-SPACE = toạ độ params.x/y của WindowManager. Có thể lệch capture-space một đoạn
+    // (ovOffX, ovOffY) nếu hệ thống trừ tai thỏ / thanh trạng thái khỏi vùng layout.
+    // Quy tắc: CHỈ đổi sang overlay-space ở khâu VẼ:  params.x = capX - ovOffX.
+    private volatile int roiRealX = 0;
+    private volatile int roiRealY = 0;
+    private volatile int ovOffX = 0;
+    private volatile int ovOffY = 0;
+    private WindowManager.LayoutParams roiParams;
+    private final Handler uiHandler = new Handler(Looper.getMainLooper());
 
     private byte[] cachedTemplateData = null;
 
@@ -266,111 +278,147 @@ public class FloatingService extends Service {
         }
     }
     
+    /**
+     * LayoutParams cho overlay: neo vào MÀN HÌNH VẬT LÝ chứ không phải vùng "an toàn".
+     * Thiếu FLAG_LAYOUT_IN_SCREEN | FLAG_LAYOUT_NO_LIMITS và layoutInDisplayCutoutMode thì
+     * WindowManager tính (0,0) từ mép trong của tai thỏ / thanh trạng thái -> mọi overlay bị lệch.
+     */
+    private WindowManager.LayoutParams newOverlayParams(int w, int h) {
+        int type = (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+                ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+                : WindowManager.LayoutParams.TYPE_PHONE;
+        WindowManager.LayoutParams p = new WindowManager.LayoutParams(
+                w, h, type,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                        | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+                        | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
+                        | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                PixelFormat.TRANSLUCENT);
+        p.gravity = Gravity.TOP | Gravity.LEFT;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            p.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS;
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            p.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+        }
+        return p;
+    }
+
+    private View makeDot(int fill, int stroke, int strokePx) {
+        View v = new View(this);
+        GradientDrawable circle = new GradientDrawable();
+        circle.setShape(GradientDrawable.OVAL);
+        circle.setColor(fill);
+        circle.setStroke(strokePx, stroke);
+        v.setBackground(circle);
+        return v;
+    }
+
+    /** Đặt tâm một overlay đúng vào điểm (capX, capY) của CAPTURE-SPACE. Gọi trên UI thread. */
+    private void placeCentered(View v, int capX, int capY, int size) {
+        if (v == null || windowManager == null) return;
+        try {
+            WindowManager.LayoutParams p = (WindowManager.LayoutParams) v.getLayoutParams();
+            p.x = capX - size / 2 - ovOffX;
+            p.y = capY - size / 2 - ovOffY;
+            windowManager.updateViewLayout(v, p);
+        } catch (Exception e) {
+            Log.e(TAG_ERROR, "Lỗi đặt overlay: " + e.getMessage());
+        }
+    }
+
     private void drawRoiBox(int screenW, int screenH) {
-        try {
-            roiView = new View(this);
-            GradientDrawable border = new GradientDrawable();
-            border.setColor(0x00000000); 
-            border.setStroke(5, 0xFF00D2FF); 
-            roiView.setBackground(border);
+        // ROI trong CAPTURE-SPACE: tâm ROI = đúng tâm súng. KHÔNG đọc lại từ getLocationOnScreen.
+        // Gán ĐỒNG BỘ (trước khi post) để luồng capture không bao giờ thấy ROI = (0,0).
+        roiRealX = FF_CROSSHAIR_X - roiBoxSize / 2;
+        roiRealY = FF_CROSSHAIR_Y - roiBoxSize / 2;
 
-            int layoutParamType = (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) ?
-                    WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY : WindowManager.LayoutParams.TYPE_PHONE;
+        uiHandler.post(() -> {
+            try {
+                if (roiView != null) return;
 
-            WindowManager.LayoutParams params = new WindowManager.LayoutParams(
-                    roiBoxSize, roiBoxSize,
-                    layoutParamType, WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
-                    PixelFormat.TRANSLUCENT
-            );
-            params.gravity = Gravity.TOP | Gravity.LEFT;
-            
-            params.x = FF_CROSSHAIR_X - (roiBoxSize / 2); 
-            params.y = FF_CROSSHAIR_Y - (roiBoxSize / 2);
+                roiView = new View(this);
+                GradientDrawable border = new GradientDrawable();
+                border.setColor(0x00000000);
+                border.setStroke(5, 0xFF00D2FF);
+                roiView.setBackground(border);
 
-            roiRealX = params.x;
-            roiRealY = params.y;
+                roiParams = newOverlayParams(roiBoxSize, roiBoxSize);
+                roiParams.x = roiRealX - ovOffX;
+                roiParams.y = roiRealY - ovOffY;
+                windowManager.addView(roiView, roiParams);
 
-            windowManager.addView(roiView, params);
-            Log.i(TAG_FRAME, "Đã vẽ khung ROI tại X=" + params.x + ", Y=" + params.y);
-
-            roiView.post(() -> {
-                try {
-                    int[] loc = new int[2];
-                    roiView.getLocationOnScreen(loc);
-                    if (loc[0] != roiRealX || loc[1] != roiRealY) {
-                        Log.w(TAG_FRAME, "ROI lệch: params=(" + roiRealX + "," + roiRealY + ") thật=(" + loc[0] + "," + loc[1] + ") -> dùng toạ độ thật");
+                // Đo độ lệch overlay-space <-> capture-space SAU MỖI LẦN layout (kể cả khi xoay màn hình).
+                roiView.getViewTreeObserver().addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
+                    @Override
+                    public void onGlobalLayout() {
+                        if (roiView == null || roiParams == null) return;
+                        int[] loc = new int[2];
+                        roiView.getLocationOnScreen(loc);
+                        int offX = loc[0] - roiParams.x;
+                        int offY = loc[1] - roiParams.y;
+                        if (offX != ovOffX || offY != ovOffY) {
+                            Log.w(TAG_FRAME, "Overlay lệch (" + offX + "," + offY + ") px so với màn hình thật"
+                                    + " -> bù khi vẽ (ROI quét vẫn đúng toạ độ capture)");
+                            ovOffX = offX;
+                            ovOffY = offY;
+                            repositionOverlays();
+                        }
                     }
-                    roiRealX = loc[0];
-                    roiRealY = loc[1];
+                });
 
-                    showDebugCenter(roiRealX + (roiBoxSize / 2), roiRealY + (roiBoxSize / 2));
+                showDebugCenter(FF_CROSSHAIR_X, FF_CROSSHAIR_Y);
+                Log.i(TAG_FRAME, "ROI capture-space: góc=(" + roiRealX + "," + roiRealY + ") tâm=("
+                        + FF_CROSSHAIR_X + "," + FF_CROSSHAIR_Y + ") màn hình=" + screenW + "x" + screenH);
+            } catch (Exception e) {
+                Log.e(TAG_ERROR, "Lỗi vẽ khung ROI: " + e.getMessage());
+            }
+        });
+    }
+
+    /** Vẽ lại khung xanh + chấm vàng theo độ lệch hiện tại (sau xoay màn hình / đổi inset). */
+    private void repositionOverlays() {
+        uiHandler.post(() -> {
+            if (roiView != null && roiParams != null) {
+                try {
+                    roiParams.x = roiRealX - ovOffX;
+                    roiParams.y = roiRealY - ovOffY;
+                    windowManager.updateViewLayout(roiView, roiParams);
                 } catch (Exception e) {
-                    Log.e(TAG_ERROR, "Không lấy được vị trí ROI thật: " + e);
+                    Log.e(TAG_ERROR, "Lỗi dời khung ROI: " + e.getMessage());
                 }
-            });
-        } catch (Exception e) {
-            Log.e(TAG_ERROR, "Lỗi vẽ khung ROI: " + e.getMessage());
-        }
+            }
+            placeCentered(debugCenterView, FF_CROSSHAIR_X, FF_CROSSHAIR_Y, 16);
+        });
     }
 
-    private void showDebugCenter(int x, int y) {
-        try {
-            if (debugCenterView == null) {
-                debugCenterView = new View(this);
-                GradientDrawable circle = new GradientDrawable();
-                circle.setShape(GradientDrawable.OVAL); 
-                circle.setColor(0xFFFFFF00); 
-                circle.setStroke(2, 0xFF000000); 
-                debugCenterView.setBackground(circle);
-
-                int type = (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) ?
-                        WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY : WindowManager.LayoutParams.TYPE_PHONE;
-
-                WindowManager.LayoutParams params = new WindowManager.LayoutParams(
-                        16, 16, 
-                        type, WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
-                        PixelFormat.TRANSLUCENT
-                );
-                params.gravity = Gravity.TOP | Gravity.LEFT;
-                windowManager.addView(debugCenterView, params);
+    /** Chấm VÀNG = tâm súng (FF_CROSSHAIR) trong CAPTURE-SPACE. */
+    private void showDebugCenter(final int capX, final int capY) {
+        uiHandler.post(() -> {
+            try {
+                if (debugCenterView == null) {
+                    debugCenterView = makeDot(0xFFFFFF00, 0xFF000000, 2);
+                    windowManager.addView(debugCenterView, newOverlayParams(16, 16));
+                }
+                placeCentered(debugCenterView, capX, capY, 16);
+            } catch (Exception e) {
+                Log.e(TAG_ERROR, "Lỗi vẽ chấm tâm: " + e.getMessage());
             }
-            WindowManager.LayoutParams p = (WindowManager.LayoutParams) debugCenterView.getLayoutParams();
-            p.x = x - 8; 
-            p.y = y - 8;
-            windowManager.updateViewLayout(debugCenterView, p);
-        } catch (Exception e) {
-            Log.e(TAG_ERROR, "Lỗi vẽ chấm tâm: " + e.getMessage());
-        }
+        });
     }
 
-    private void showDebugDot(int x, int y) {
-        try {
-            if (debugDotView == null) {
-                debugDotView = new View(this);
-                GradientDrawable circle = new GradientDrawable();
-                circle.setShape(GradientDrawable.OVAL); 
-                circle.setColor(0xFFFF0000); 
-                circle.setStroke(3, 0xFFFFFFFF); 
-                debugDotView.setBackground(circle);
-
-                int type = (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) ?
-                        WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY : WindowManager.LayoutParams.TYPE_PHONE;
-
-                WindowManager.LayoutParams params = new WindowManager.LayoutParams(
-                        20, 20, 
-                        type, WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
-                        PixelFormat.TRANSLUCENT
-                );
-                params.gravity = Gravity.TOP | Gravity.LEFT;
-                windowManager.addView(debugDotView, params);
+    /** Chấm ĐỎ = điểm Neo (capX, capY) trong CAPTURE-SPACE. An toàn khi gọi từ luồng capture. */
+    private void showDebugDot(final int capX, final int capY) {
+        uiHandler.post(() -> {
+            try {
+                if (debugDotView == null) {
+                    debugDotView = makeDot(0xFFFF0000, 0xFFFFFFFF, 3);
+                    windowManager.addView(debugDotView, newOverlayParams(20, 20));
+                }
+                placeCentered(debugDotView, capX, capY, 20);
+            } catch (Exception e) {
+                Log.e(TAG_ERROR, "Lỗi vẽ chấm debug: " + e.getMessage());
             }
-            WindowManager.LayoutParams p = (WindowManager.LayoutParams) debugDotView.getLayoutParams();
-            p.x = x - 10; 
-            p.y = y - 10;
-            windowManager.updateViewLayout(debugDotView, p);
-        } catch (Exception e) {
-            Log.e(TAG_ERROR, "Lỗi vẽ chấm debug: " + e.getMessage());
-        }
+        });
     }
 
     private final ImageReader.OnImageAvailableListener frameListener = reader -> {
@@ -618,6 +666,7 @@ public class FloatingService extends Service {
             }
             Log.i(TAG_FRAME, "Đổi hướng/kích thước -> " + captureWidth + "x" + captureHeight + " @" + captureDpi + "dpi");
             maaRestartTried = false;
+            repositionOverlays();   // inset đổi khi xoay -> đo lại & vẽ lại overlay
             MinitouchController.close();
             MinitouchController.init(this);
         } catch (Exception e) {
