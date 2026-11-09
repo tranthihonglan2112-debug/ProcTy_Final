@@ -47,6 +47,10 @@ public final class AimMath {
         }
         int ex = (int) Math.round(sx + vx);
         int ey = (int) Math.round(sy + vy);
+        // BẮT BUỘC VUỐT: trục nào còn lệch (dù 1px) thì ngón tay phải dịch tối thiểu 1px theo đúng hướng,
+        // không để làm tròn về 0 rồi bị hủy (nguyên nhân chấm vàng dừng cách chấm đỏ vài px).
+        if (dx != 0 && ex == sx) ex = sx + (vx < 0 ? -1 : 1);
+        if (dy != 0 && ey == sy) ey = sy + (vy < 0 ? -1 : 1);
         ex = Math.max(0, Math.min(screenW - 1, ex));
         ey = Math.max(0, Math.min(screenH - 1, ey));
         return new int[]{ex, ey};

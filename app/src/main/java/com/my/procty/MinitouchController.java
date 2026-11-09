@@ -14,6 +14,8 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import rikka.shizuku.Shizuku;
@@ -48,6 +50,19 @@ public class MinitouchController {
     // MỚI: không gian toạ độ MaaTouch tự báo ở header "^ <contacts> <maxX> <maxY> <pressure>"
     private static volatile int maxX = 0;
     private static volatile int maxY = 0;
+
+    // Chống kẹt ngón tay: sau mỗi cú vuốt luôn hẹn giờ gửi thêm "u 0" cưỡng bức.
+    private static final ScheduledExecutorService RELEASER = Executors.newSingleThreadScheduledExecutor(r -> {
+        Thread t = new Thread(r, "MaaTouchRelease");
+        t.setDaemon(true);
+        return t;
+    });
+    private static volatile long gestureSeq = 0;
+
+    /** Nhấc ngón tay cưỡng bức (an toàn khi gọi bất cứ lúc nào). */
+    public static void forceRelease() {
+        send("u 0\nc\n");
+    }
 
     public static int getMaxX() { return maxX; }
     public static int getMaxY() { return maxY; }
@@ -252,11 +267,11 @@ public class MinitouchController {
      * MỚI: vuốt qua NHIỀU điểm (pts[0] = điểm chạm xuống, các điểm sau là MOVE), mỗi bước chờ stepMs.
      * Thay cho swipe() cũ vốn chỉ có đúng 1 MOVE trong ~10ms (nhảy vài trăm px trong chưa tới 1 khung hình).
      */
-    public static void swipePath(int[][] pts, int stepMs) {
-        if (pts == null || pts.length < 2) return;
+    public static boolean swipePath(int[][] pts, int stepMs) {
+        if (pts == null || pts.length < 2) return false;
         if (!ready) {
             maybeRestart();
-            return;
+            return false;
         }
         int wait = Math.max(stepMs, 1);
         StringBuilder sb = new StringBuilder(96 + pts.length * 40);
@@ -268,18 +283,28 @@ public class MinitouchController {
         sb.append("w ").append(wait).append("\nu 0\nc\n");
         Log.d(TAG, "swipePath: gui " + pts.length + " diem, " + (pts.length - 1) + " lenh m, wait=" + wait
                 + "ms, cmd=" + pts.length * 2 + " dong -> " + sb.toString().replace("\n", "|"));
-        send(sb.toString());
+        boolean ok = send(sb.toString());
+        if (!ok) return false;
+
+        // Lớp bảo hiểm: khi cú vuốt dự kiến kết thúc (+30ms) mà không có cú vuốt mới thì gửi u 0 cưỡng bức.
+        final long seq = ++gestureSeq;
+        long totalMs = (long) pts.length * wait;
+        RELEASER.schedule(() -> { if (gestureSeq == seq) forceRelease(); },
+                totalMs + 30, java.util.concurrent.TimeUnit.MILLISECONDS);
+        return true;
     }
 
-    private static void send(String cmd) {
+    private static boolean send(String cmd) {
         synchronized (LOCK) {
-            if (maaStdin == null) return;
+            if (maaStdin == null) return false;
             try {
                 maaStdin.write(cmd.getBytes(StandardCharsets.UTF_8));
                 maaStdin.flush();
+                return true;
             } catch (IOException e) {
                 Log.e(TAG, "Lỗi gửi lệnh (MaaTouch có thể đã chết): " + e.getMessage());
                 ready = false;
+                return false;
             }
         }
     }

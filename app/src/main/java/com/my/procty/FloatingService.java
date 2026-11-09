@@ -53,7 +53,6 @@ public class FloatingService extends Service {
 
     private static final int SWIPE_START_X = 1299;      
     private static final int SWIPE_START_Y = 360;
-    private static final double DEAD_ZONE_PX = 3.0;     // <3px: neo đã trùng tâm, vuốt thêm chỉ gây giật
     private static final double DAMP = 1.0;
     private static final double MAX_DRAG_PX = 450.0;
     // Cử chỉ phải kéo dài >= 3-4 khung hình game (~60ms). Bản cũ 2 bước x 8ms = ~24ms: DOWN/MOVE/UP
@@ -62,7 +61,7 @@ public class FloatingService extends Service {
     // 16ms/buoc: moi MOVE roi vao DUNG 1 khung vsync (16.7ms) rieng -> khong bi gop batch.
     // Tong ~128ms >= 7-8 khung game @60fps (code cu 5 x 10ms = 50ms ~ 3 khung -> bi gop con 2-3 nac).
     private static final int SWIPE_STEP_MS = 16;
-    // Không gửi cử chỉ mới khi cử chỉ trước chưa xong (tránh xếp hàng lệnh cũ trong stdin MaaTouch).
+    // Chỉ để KHÔNG CHỒNG 2 cử chỉ lên nhau (không phải vùng chết): cử chỉ trước chạy ~144ms.
     private static final long MIN_SWIPE_INTERVAL_MS = (SWIPE_STEPS + 1) * SWIPE_STEP_MS + 20;
 
     // ---- Hiệu chuẩn ----
@@ -133,14 +132,14 @@ public class FloatingService extends Service {
     private int lastLoadedMode = -1;
 
     // ===== MAY DEM CHUNG MINH: tai sao khong vuot? =====
-    private long gFrameSkip, gCalBusy, gNoDetect, gDeadZone, gThrottle, gTooSmall, gSwiped;
+    private long gFrameSkip, gCalBusy, gNoDetect, gOnTarget, gThrottle, gDropped, gSwiped;
     private void logGates() {
         Log.d("ProcTyGate", "frames: bo_qua_6=" + gFrameSkip
                 + " | calibration_chiem=" + gCalBusy
                 + " | khong_nhan_dien=" + gNoDetect
-                + " | deadzone<3px=" + gDeadZone
-                + " | throttle_80ms=" + gThrottle
-                + " | vuot<2px=" + gTooSmall
+                + " | da_trung_tam=" + gOnTarget
+                + " | cho_cu_truoc=" + gThrottle
+                + " | MaaTouch_chua_san_sang=" + gDropped
                 + " | DA_VUOT=" + gSwiped);
     }
 
@@ -544,31 +543,40 @@ public class FloatingService extends Service {
                 // Độ lệch Neo so với TÂM SÚNG: đây mới là thứ cần vuốt để triệt tiêu.
                 int relativeDeltaX = targetX - FF_CROSSHAIR_X;
                 int relativeDeltaY = targetY - FF_CROSSHAIR_Y;
-                double dist = Math.hypot(relativeDeltaX, relativeDeltaY);
+
+                // BẮT BUỘC VUỐT: chỉ dừng khi chấm vàng ĐÈ HẲN lên chấm đỏ (lệch đúng 0px cả 2 trục).
+                if (relativeDeltaX == 0 && relativeDeltaY == 0) {
+                    gOnTarget++;
+                    if (gOnTarget % 30 == 1) logGates();
+                    return;
+                }
 
                 long now = SystemClock.uptimeMillis();
-
-                if (dist < DEAD_ZONE_PX) { gDeadZone++; if (gDeadZone % 30 == 1) logGates(); }
-                else if (now - lastSwipeUptime < MIN_SWIPE_INTERVAL_MS) { gThrottle++; if (gThrottle % 30 == 1) logGates(); }
-                else {
-                    int[] end = AimMath.relativeEnd(SWIPE_START_X, SWIPE_START_Y, relativeDeltaX, relativeDeltaY,
-                            aimGx, aimGy, gTrusted ? DAMP : FALLBACK_DAMP, MAX_DRAG_PX, imgW, imgH);
-                    if (Math.abs(end[0] - SWIPE_START_X) + Math.abs(end[1] - SWIPE_START_Y) < 2) {
-                        gTooSmall++;                                   // vuốt 0-1px = vô ích
-                        if (gTooSmall % 30 == 1) logGates();
-                        return;                                        // KHONG dot lastSwipeUptime o day (sua bug chock 80ms)
-                    }
-                    lastSwipeUptime = now;                             // chi chot gio khi thuc su vuot
-                    gSwiped++;
-                    Log.d("ProcTyTarget", "roi=(" + roiX + "," + roiY + " " + roiW + "x" + roiH + ")"
-                            + " delta=(" + deltaX + "," + deltaY + ")"
-                            + " target=(" + targetX + "," + targetY + ")"
-                            + " rel=(" + relativeDeltaX + "," + relativeDeltaY + ")"
-                            + " g=(" + aimGx + "," + aimGy + (gTrusted ? ")" : ")[DỰ PHÒNG]")
-                            + " -> vuốt " + SWIPE_START_X + "," + SWIPE_START_Y + " => " + end[0] + "," + end[1]);
-                    MinitouchController.swipePath(
-                            AimMath.easedPath(SWIPE_START_X, SWIPE_START_Y, end[0], end[1], SWIPE_STEPS), SWIPE_STEP_MS);
+                if (now - lastSwipeUptime < MIN_SWIPE_INTERVAL_MS) {   // cử chỉ trước chưa xong
+                    gThrottle++;
+                    if (gThrottle % 30 == 1) logGates();
+                    return;
                 }
+
+                int[] end = AimMath.relativeEnd(SWIPE_START_X, SWIPE_START_Y, relativeDeltaX, relativeDeltaY,
+                        aimGx, aimGy, gTrusted ? DAMP : FALLBACK_DAMP, MAX_DRAG_PX, imgW, imgH);
+
+                // Luôn vuốt (không còn hủy cú vuốt ngắn). Chỉ chốt giờ khi lệnh THỰC SỰ được gửi.
+                boolean sent = MinitouchController.swipePath(
+                        AimMath.easedPath(SWIPE_START_X, SWIPE_START_Y, end[0], end[1], SWIPE_STEPS), SWIPE_STEP_MS);
+                if (!sent) {
+                    gDropped++;
+                    if (gDropped % 30 == 1) logGates();
+                    return;
+                }
+                lastSwipeUptime = now;
+                gSwiped++;
+                Log.d("ProcTyTarget", "roi=(" + roiX + "," + roiY + " " + roiW + "x" + roiH + ")"
+                        + " delta=(" + deltaX + "," + deltaY + ")"
+                        + " target=(" + targetX + "," + targetY + ")"
+                        + " rel=(" + relativeDeltaX + "," + relativeDeltaY + ")"
+                        + " g=(" + aimGx + "," + aimGy + (gTrusted ? ")" : ")[DỰ PHÒNG]")
+                        + " -> vuốt " + SWIPE_START_X + "," + SWIPE_START_Y + " => " + end[0] + "," + end[1]);
             }
         } catch (Exception e) {
             Log.e(TAG_ERROR, "Lỗi frame: " + e, e);
