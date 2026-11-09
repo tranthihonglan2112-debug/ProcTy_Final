@@ -62,7 +62,7 @@ public class FloatingService extends Service {
     // Tong ~128ms >= 7-8 khung game @60fps (code cu 5 x 10ms = 50ms ~ 3 khung -> bi gop con 2-3 nac).
     private static final int SWIPE_STEP_MS = 16;
     // Chỉ để KHÔNG CHỒNG 2 cử chỉ lên nhau (không phải vùng chết): cử chỉ trước chạy ~144ms.
-    private static final long MIN_SWIPE_INTERVAL_MS = (SWIPE_STEPS + 1) * SWIPE_STEP_MS + 20;
+    private static final long MIN_SWIPE_INTERVAL_MS = (SWIPE_STEPS + 1) * SWIPE_STEP_MS + 60;
 
     // ---- Hiệu chuẩn ----
     private static final int CAL_STEPS = 6;
@@ -269,7 +269,7 @@ public class FloatingService extends Service {
     }
 
     private ImageReader createReader(int width, int height) {
-        ImageReader reader = ImageReader.newInstance(width, height, PixelFormat.RGBA_8888, 2);
+        ImageReader reader = ImageReader.newInstance(width, height, PixelFormat.RGBA_8888, 4);
         reader.setOnImageAvailableListener(frameListener, captureHandler);
         return reader;
     }
@@ -299,7 +299,11 @@ public class FloatingService extends Service {
             Log.i(TAG_FRAME, "Capture sẵn sàng: " + captureWidth + "x" + captureHeight + " @" + captureDpi + "dpi");
 
             drawRoiBox(captureWidth, captureHeight);
-            
+
+            tickRunning = true;
+            captureHandler.removeCallbacks(idleTick);
+            captureHandler.postDelayed(idleTick, PROCESS_INTERVAL_MS);
+
         } catch (Exception e) {
             Log.e(TAG_ERROR, "Lỗi initScreenCapture: " + e, e);
         }
@@ -448,18 +452,56 @@ public class FloatingService extends Service {
         });
     }
 
-    private final ImageReader.OnImageAvailableListener frameListener = reader -> {
-        Image image = null;
-        try {
-            image = reader.acquireLatestImage();
-            if (image == null) return;
+    // ===== VÒNG LẶP ĐỘC LẬP VỚI KHUNG HÌNH =====
+    // VirtualDisplay CHỈ đẩy khung mới khi màn hình có thay đổi. Màn hình đứng yên (chấm đỏ đứng yên,
+    // cảnh không đổi) => onImageAvailable KHÔNG được gọi nữa => bản cũ không bao giờ kiểm tra lại,
+    // cú vuốt cuối bị throttle/bỏ qua rồi im luôn. Giải pháp: GIỮ khung mới nhất và xử lý lại theo đồng hồ.
+    private static final long PROCESS_INTERVAL_MS = 50;
+    private final Object imgLock = new Object();
+    private Image heldImage = null;
+    private long lastProcessUptime = 0;
+    private volatile boolean tickRunning = false;
 
+    private final ImageReader.OnImageAvailableListener frameListener = reader -> {
+        Image fresh = null;
+        try {
+            fresh = reader.acquireLatestImage();
+        } catch (Exception e) {
+            Log.e(TAG_ERROR, "acquireLatestImage lỗi: " + e);
+        }
+        if (fresh == null) return;
+        synchronized (imgLock) {
+            if (heldImage != null) { try { heldImage.close(); } catch (Exception ignored) {} }
+            heldImage = fresh;
+        }
+        processHeldFrame();
+    };
+
+    private final Runnable idleTick = new Runnable() {
+        @Override
+        public void run() {
+            if (!tickRunning) return;
+            processHeldFrame();                      // khung đứng yên vẫn được xử lý lại
+            Handler h = captureHandler;
+            if (h != null && tickRunning) h.postDelayed(this, PROCESS_INTERVAL_MS);
+        }
+    };
+
+    private void processHeldFrame() {
+        long nowMs = SystemClock.uptimeMillis();
+        synchronized (imgLock) {
+            if (heldImage == null) return;
+            if (nowMs - lastProcessUptime < PROCESS_INTERVAL_MS) { gFrameSkip++; return; }
+            lastProcessUptime = nowMs;
+            processFrame(heldImage);
+        }
+    }
+
+    private void processFrame(Image image) {
+        try {
             int imgW = image.getWidth();
             int imgH = image.getHeight();
             boolean portrait = imgW < imgH;
-
-            frameCount++;
-            if (frameCount % 6 != 0) { gFrameSkip++; return; }
 
             isScanning = prefs.getBoolean("is_scanning", false);
             int mode = prefs.getInt("mode", 1);
@@ -580,10 +622,8 @@ public class FloatingService extends Service {
             }
         } catch (Exception e) {
             Log.e(TAG_ERROR, "Lỗi frame: " + e, e);
-        } finally {
-            if (image != null) image.close();
         }
-    };
+    }
 
     private boolean calibrateStep(ByteBuffer buffer, int imgW, int imgH, int rowStride) {
         if (aimGx != 0 && aimGy != 0) return false;
@@ -710,6 +750,7 @@ public class FloatingService extends Service {
         if (size[0] == captureWidth && size[1] == captureHeight && size[2] == captureDpi) return;
 
         try {
+            dropHeldImage();   // ảnh giữ lại thuộc reader cũ -> phải bỏ trước khi đổi kích thước
             ImageReader old = imageReader;
             ImageReader fresh = createReader(size[0], size[1]);
 
@@ -735,7 +776,16 @@ public class FloatingService extends Service {
         }
     }
 
+    private void dropHeldImage() {
+        synchronized (imgLock) {
+            if (heldImage != null) { try { heldImage.close(); } catch (Exception ignored) {} heldImage = null; }
+        }
+    }
+
     private synchronized void releaseCapture() {
+        tickRunning = false;
+        if (captureHandler != null) captureHandler.removeCallbacks(idleTick);
+        dropHeldImage();
         if (displayManager != null) {
             try { displayManager.unregisterDisplayListener(displayListener); } catch (Exception ignored) {}
         }
