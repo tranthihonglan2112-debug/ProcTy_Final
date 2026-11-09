@@ -76,6 +76,24 @@ public class FloatingService extends Service {
     private static final double FALLBACK_G = 2.0;
     private static final double FALLBACK_DAMP = 0.8;
 
+    // [BƯỚC 1] Chấm debug nằm TRONG ảnh chụp -> che đầu mục tiêu -> nhận diện hụt. Mặc định TẮT khi chạy thật.
+    // Bật để xem: đổi DEBUG_DOTS_DEFAULT = true (hoặc prefs "debug_dots" = true).
+    private static final boolean DEBUG_DOTS_DEFAULT = false;
+    private volatile boolean debugDots = DEBUG_DOTS_DEFAULT;
+
+    // [BƯỚC 3] Theo dõi mục tiêu: thấy rồi thì lần sau chỉ quét ô nhỏ quanh vị trí cũ.
+    private static final int TRACK_BOX = 160;
+    private boolean trackValid = false;
+    private int trackX = 0, trackY = 0;
+
+    // [BƯỚC 4] Tự học g: so độ lệch trước/sau mỗi cú vuốt.
+    private static final int LEARN_MIN_DRAG = 4;
+    private boolean swipeLearnValid = false;
+    private int prevRelX, prevRelY, prevDragX, prevDragY;
+    private int learnOk = 0;
+    private long scanMaxNs = 0;
+    private int scanHit = 0;
+
     private static final int FF_CROSSHAIR_X = 800;
     private static final int FF_CROSSHAIR_Y = 360;
 
@@ -407,6 +425,12 @@ public class FloatingService extends Service {
     }
 
     /** Vẽ lại khung xanh + chấm vàng theo độ lệch hiện tại (sau xoay màn hình / đổi inset). */
+    private void removeDebugDots() {
+        if (windowManager == null) return;
+        if (debugDotView != null) { try { windowManager.removeView(debugDotView); } catch (Exception ignored) {} debugDotView = null; }
+        if (debugCenterView != null) { try { windowManager.removeView(debugCenterView); } catch (Exception ignored) {} debugCenterView = null; }
+    }
+
     private void repositionOverlays() {
         uiHandler.post(() -> {
             if (roiView != null && roiParams != null) {
@@ -424,6 +448,7 @@ public class FloatingService extends Service {
 
     /** Chấm VÀNG = tâm súng (FF_CROSSHAIR) trong CAPTURE-SPACE. */
     private void showDebugCenter(final int capX, final int capY) {
+        if (!debugDots) return;
         uiHandler.post(() -> {
             try {
                 if (debugCenterView == null) {
@@ -439,6 +464,7 @@ public class FloatingService extends Service {
 
     /** Chấm ĐỎ = điểm Neo (capX, capY) trong CAPTURE-SPACE. An toàn khi gọi từ luồng capture. */
     private void showDebugDot(final int capX, final int capY) {
+        if (!debugDots) return;
         uiHandler.post(() -> {
             try {
                 if (debugDotView == null) {
@@ -509,6 +535,14 @@ public class FloatingService extends Service {
             int cG = prefs.getInt("color_g", 50);
             int cB = prefs.getInt("color_b", 50);
 
+            boolean wantDots = prefs.getBoolean("debug_dots", DEBUG_DOTS_DEFAULT);
+            if (wantDots != debugDots) {
+                debugDots = wantDots;
+                uiHandler.post(() -> {
+                    if (!debugDots) removeDebugDots(); else showDebugCenter(FF_CROSSHAIR_X, FF_CROSSHAIR_Y);
+                });
+            }
+
             if (!isScanning) return; 
             if (REQUIRE_LANDSCAPE && portrait) return;
 
@@ -519,10 +553,18 @@ public class FloatingService extends Service {
             int rowStride = planes[0].getRowStride();
 
             final int roiInset = 5;
-            final int roiX = roiRealX + roiInset;
-            final int roiY = roiRealY + roiInset;
-            final int roiW = roiBoxSize - 2 * roiInset;
-            final int roiH = roiBoxSize - 2 * roiInset;
+            final int fullX = roiRealX + roiInset;
+            final int fullY = roiRealY + roiInset;
+            final int fullSize = roiBoxSize - 2 * roiInset;
+            int roiX = fullX, roiY = fullY, roiW = fullSize, roiH = fullSize;
+            boolean usedSmall = false;
+            if (trackValid && mode == 2) {   // đã thấy mục tiêu -> chỉ quét ô nhỏ quanh vị trí cũ
+                roiW = Math.min(TRACK_BOX, fullSize);
+                roiH = roiW;
+                roiX = Math.max(fullX, Math.min(fullX + fullSize - roiW, trackX - roiW / 2));
+                roiY = Math.max(fullY, Math.min(fullY + fullSize - roiH, trackY - roiH / 2));
+                usedSmall = true;
+            }
             if (roiX < 0 || roiY < 0 || roiX + roiW > imgW || roiY + roiH > imgH) {
                 Log.e(TAG_ERROR, "ROI nằm ngoài khung hình: roi=(" + roiX + "," + roiY + " " + roiW + "x" + roiH
                         + ") khung=" + imgW + "x" + imgH);
@@ -560,14 +602,22 @@ public class FloatingService extends Service {
 
             long t0 = System.nanoTime();
             long result = nativeFindTarget(buffer, imgW, imgH, rowStride, roiX, roiY, roiW, roiH, mode, cR, cG, cB);
-            scanNs += System.nanoTime() - t0;
-            if (++scanN >= 30) {                      
-                Log.d("ProcTyPerf", "so khớp TB " + (scanNs / scanN) / 1000000.0 + " ms/lần (30 lần gần nhất)");
-                scanN = 0;
-                scanNs = 0;
+            long dtNs = System.nanoTime() - t0;
+            scanNs += dtNs;
+            if (dtNs > scanMaxNs) scanMaxNs = dtNs;
+            if (result != 0) scanHit++;
+            if (++scanN >= 30) {
+                Log.d("ProcTyPerf", "so khớp TB " + (scanNs / scanN) / 1000000.0 + " ms | max "
+                        + scanMaxNs / 1000000.0 + " ms | thấy " + scanHit + "/30 | ROI " + roiW + "px"
+                        + (usedSmall ? " (theo dõi)" : " (quét đủ)"));
+                scanN = 0; scanNs = 0; scanMaxNs = 0; scanHit = 0;
             }
 
-            if (result == 0) gNoDetect++;
+            if (result == 0) {
+                gNoDetect++;
+                trackValid = false;          // mất dấu -> khung sau quét đủ ROI
+                swipeLearnValid = false;     // không học g qua khung hụt
+            }
             int[] delta = AnchorMath.decodeDelta(result);
             if (delta != null) {
                 final int deltaX = delta[0];   // Neo - TÂM ROI (do C++ trả về)
@@ -578,6 +628,7 @@ public class FloatingService extends Service {
                 int[] tgt = AnchorMath.toScreen(roiX, roiY, roiW, roiH, deltaX, deltaY);
                 int targetX = tgt[0];
                 int targetY = tgt[1];
+                trackValid = true; trackX = targetX; trackY = targetY;
 
                 // CHẤM ĐỎ DEBUG: nằm đúng trên điểm Neo
                 showDebugDot(targetX, targetY);
@@ -586,6 +637,14 @@ public class FloatingService extends Service {
                 int relativeDeltaX = targetX - FF_CROSSHAIR_X;
                 int relativeDeltaY = targetY - FF_CROSSHAIR_Y;
 
+                long now = SystemClock.uptimeMillis();
+
+                // [BƯỚC 4] Cảnh đã ổn định sau cú vuốt trước -> đo xem nó thực sự giảm lệch bao nhiêu.
+                if (swipeLearnValid && now - lastSwipeUptime >= MIN_SWIPE_INTERVAL_MS) {
+                    learnGain(relativeDeltaX, relativeDeltaY);
+                    swipeLearnValid = false;
+                }
+
                 // BẮT BUỘC VUỐT: chỉ dừng khi chấm vàng ĐÈ HẲN lên chấm đỏ (lệch đúng 0px cả 2 trục).
                 if (relativeDeltaX == 0 && relativeDeltaY == 0) {
                     gOnTarget++;
@@ -593,7 +652,6 @@ public class FloatingService extends Service {
                     return;
                 }
 
-                long now = SystemClock.uptimeMillis();
                 if (now - lastSwipeUptime < MIN_SWIPE_INTERVAL_MS) {   // cử chỉ trước chưa xong
                     gThrottle++;
                     if (gThrottle % 30 == 1) logGates();
@@ -613,6 +671,9 @@ public class FloatingService extends Service {
                 }
                 lastSwipeUptime = now;
                 gSwiped++;
+                prevRelX = relativeDeltaX; prevRelY = relativeDeltaY;
+                prevDragX = end[0] - SWIPE_START_X; prevDragY = end[1] - SWIPE_START_Y;
+                swipeLearnValid = true;
                 Log.d("ProcTyTarget", "roi=(" + roiX + "," + roiY + " " + roiW + "x" + roiH + ")"
                         + " delta=(" + deltaX + "," + deltaY + ")"
                         + " target=(" + targetX + "," + targetY + ")"
@@ -623,6 +684,22 @@ public class FloatingService extends Service {
         } catch (Exception e) {
             Log.e(TAG_ERROR, "Lỗi frame: " + e, e);
         }
+    }
+
+    /** g_mới = (độ lệch giảm được) / (px ngón tay đã vuốt). Chỉ nhận mẫu hợp lý, trộn dần (EMA). */
+    private void learnGain(int relX, int relY) {
+        if (Math.abs(prevDragX) >= LEARN_MIN_DRAG) aimGx = blendGain(aimGx, (prevRelX - relX) / (double) prevDragX, "X");
+        if (Math.abs(prevDragY) >= LEARN_MIN_DRAG) aimGy = blendGain(aimGy, (prevRelY - relY) / (double) prevDragY, "Y");
+    }
+
+    private double blendGain(double g, double est, String axis) {
+        if (g == 0 || Double.isNaN(est)) return g;
+        double ratio = est / g;
+        if (ratio < 0.4 || ratio > 2.5) return g;          // mẫu lạ (mục tiêu tự chạy, cảnh chưa yên...) -> bỏ
+        double ng = 0.6 * g + 0.4 * est;
+        if (++learnOk >= 3) gTrusted = true;               // đã tự kiểm chứng -> dùng DAMP đầy đủ
+        Log.d("ProcTyLearn", "g" + axis + ": " + g + " -> " + ng + " (mẫu " + est + ")");
+        return ng;
     }
 
     private boolean calibrateStep(ByteBuffer buffer, int imgW, int imgH, int rowStride) {

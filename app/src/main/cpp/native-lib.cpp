@@ -59,6 +59,7 @@ static cv::Mat colorHist(const cv::Mat &rgb, const cv::Mat &mask) {
 }
 
 static int g_logCounter = 0;
+static int g_lastIdx = -1;   // tỉ lệ khớp tốt nhất lần trước (-1 = chưa biết -> quét đủ)
 
 // Tinh chỉnh đỉnh tương quan về dưới-pixel (parabol 3 điểm). Trả độ lệch trong [-0.5, 0.5].
 // Ảnh khớp chạy ở NỬA độ phân giải: 1 px ở đó = 2 px thật, nên không tinh chỉnh sẽ lệch tới ±2 px.
@@ -87,6 +88,7 @@ Java_com_my_procty_FloatingService_nativeLoadTemplate(JNIEnv *env, jobject /*thi
     g_masks.clear();
     g_tplScales.clear();
     g_tplHist.clear();
+    g_lastIdx = -1;
 
     if (templateData == nullptr) {          
         return JNI_TRUE;
@@ -220,7 +222,9 @@ Java_com_my_procty_FloatingService_nativeFindTarget(JNIEnv *env, jobject /*thiz*
         for (size_t i = 0; i < g_tpls.size(); i++) {
             const cv::Mat &t = g_tpls[i];
             const cv::Mat &mask = g_masks[i];
-            if (t.cols >= small.cols || t.rows >= small.rows) continue;   
+            if (t.cols >= small.cols || t.rows >= small.rows) continue;
+            // Đã biết tỉ lệ lần trước -> chỉ thử 3 tỉ lệ lân cận (nhanh ~4x). Hụt thì lần sau quét đủ.
+            if (g_lastIdx >= 0 && std::abs((int) i - g_lastIdx) > 1) continue;
 
             cv::Mat result;
             try {
@@ -273,12 +277,14 @@ Java_com_my_procty_FloatingService_nativeFindTarget(JNIEnv *env, jobject /*thiz*
                 double col = cv::compareHist(g_tplHist[bestIdx], colorHist(small(r), g_masks[bestIdx]),
                                              cv::HISTCMP_CORREL);
                 if (col < COLOR_MIN_CORREL) {
+                    g_lastIdx = -1;
                     if ((++g_logCounter % 10) == 0)
                         LOGD("mode2: bỏ ứng viên vì sai màu (hình=%.2f, màu=%.2f)", bestVal, col);
                     return 0;
                 }
             }
 
+            g_lastIdx = bestIdx;
             // NEO: vị trí (tỉ lệ) bên trong ảnh mẫu đã co giãn, đổi về độ phân giải thật, TRONG ROI.
             // Kích thước ảnh mẫu đã co giãn TÍNH CHÍNH XÁC (không dùng t.cols đã bị làm tròn).
             const double tw = g_origW * bestScale * DOWNSCALE;
@@ -289,6 +295,7 @@ Java_com_my_procty_FloatingService_nativeFindTarget(JNIEnv *env, jobject /*thiz*
             // delta so với TÂM ROI (xem "HỢP ĐỒNG TOẠ ĐỘ" ở packDelta).
             return packDelta(anchorX - centerX, anchorY - centerY);
         }
+        g_lastIdx = -1;   // không đạt ngưỡng -> lần sau quét đủ tỉ lệ
     }
 
     return 0;
