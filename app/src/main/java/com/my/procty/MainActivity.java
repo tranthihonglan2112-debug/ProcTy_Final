@@ -9,7 +9,9 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.provider.Settings;
+import android.text.TextUtils;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -21,7 +23,8 @@ public class MainActivity extends AppCompatActivity {
     private static final int MEDIA_PROJECTION_REQ_CODE = 456;
     private MediaProjectionManager projectionManager;
 
-    private Button btnCheckShizuku, btnStartProcTy;
+    private Button btnCheckShizuku, btnStartProcTy, btnSaveIp;
+    private EditText edtServerIp;
     private LinearLayout mainLayout, loadingLayout;
     private TextView tvLoadingText;
     private Handler handler = new Handler();
@@ -56,11 +59,17 @@ public class MainActivity extends AppCompatActivity {
         tvLoadingText = findViewById(R.id.tvLoadingText);
         btnCheckShizuku = findViewById(R.id.btnCheckShizuku);
         btnStartProcTy = findViewById(R.id.btnStartProcTy);
+        btnSaveIp = findViewById(R.id.btnSaveIp);
+        edtServerIp = findViewById(R.id.edtServerIp);
 
         projectionManager = (MediaProjectionManager) getSystemService(MEDIA_PROJECTION_SERVICE);
 
         SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
         boolean isFirstRun = prefs.getBoolean("isFirstRun", true);
+        
+        // Load IP đã lưu (nếu có)
+        String savedIp = prefs.getString("server_ip", "192.168.1.5");
+        edtServerIp.setText(savedIp);
 
         if (isFirstRun) {
             loadingLayout.setVisibility(LinearLayout.VISIBLE);
@@ -73,6 +82,19 @@ public class MainActivity extends AppCompatActivity {
 
         checkShizukuStatus(false);
         btnCheckShizuku.setOnClickListener(v -> checkShizukuStatus(true));
+
+        // Xử lý nút Lưu IP
+        btnSaveIp.setOnClickListener(v -> {
+            String ip = edtServerIp.getText().toString().trim();
+            if (TextUtils.isEmpty(ip)) {
+                Toast.makeText(this, "Vui lòng nhập IP!", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            SharedPreferences.Editor editor = prefs.edit();
+            editor.putString("server_ip", ip);
+            editor.apply();
+            Toast.makeText(this, "Đã lưu IP: " + ip, Toast.LENGTH_SHORT).show();
+        });
 
         btnStartProcTy.setOnClickListener(v -> {
             if (!ShizukuChecker.hasShizukuPermission()) {
@@ -155,7 +177,6 @@ public class MainActivity extends AppCompatActivity {
             }
         } else if (requestCode == MEDIA_PROJECTION_REQ_CODE) {
             if (resultCode == RESULT_OK && data != null) {
-                // CHỈ GỌI MENU SERVICE DUY NHẤT
                 Intent menuIntent = new Intent(this, FloatingMenuService.class);
                 menuIntent.putExtra("code", resultCode);
                 menuIntent.putExtra("data", data);

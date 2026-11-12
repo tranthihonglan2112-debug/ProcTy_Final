@@ -5,36 +5,18 @@ plugins {
 android {
     namespace 'com.my.procty'
     compileSdk 36 // Hạ xuống 36 vì AGP 8.13 chưa hỗ trợ 37
-    ndkVersion "27.3.13750724"
 
     defaultConfig {
         applicationId 'com.my.procty'
         minSdk 29
         targetSdk 34
         versionCode 3
-        versionName '1.2 - By Phúc 💥'
+        versionName '1.3 - By Phúc 💥'
 
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
-
-        ndk {
-            abiFilters "arm64-v8a", "armeabi-v7a"
-        }
-
-        externalNativeBuild {
-            cmake {
-                cppFlags ""
-                arguments "-DANDROID_STL=c++_shared"
-            }
-        }
     }
 
-    externalNativeBuild {
-        cmake {
-            path "src/main/cpp/CMakeLists.txt"
-        }
-    }
-
-    // ĐOẠN CODE QUAN TRỌNG ĐỂ SỬA LỖI TRÙNG LẶP FILE .SO
+    // ĐOẠN CODE QUAN TRỌNG ĐỂ SỬA LỖI TRÙNG LẶP FILE .SO (Giữ lại phòng hờ)
     packaging {
         jniLibs {
             pickFirsts += ['**/libc++_shared.so']
@@ -73,4 +55,7 @@ dependencies {
     implementation libs.androidx.constraintlayout
     implementation 'dev.rikka.shizuku:api:13.1.5'
     implementation 'dev.rikka.shizuku:provider:13.1.5'
+    
+    // THÊM DÒNG NÀY ĐỂ DÙNG SOCKET (Nếu không cần OkHttp thì thôi, tại tui dùng Socket thuần)
+    implementation 'com.squareup.okhttp3:okhttp:4.10.0'
 }

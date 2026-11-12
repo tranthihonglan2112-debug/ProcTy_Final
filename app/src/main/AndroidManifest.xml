@@ -6,13 +6,16 @@
         <package android:name="moe.shizuku.privileged.api" />
     </queries>
 
+    <!-- Quyền vẽ đè và Service -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
     
-    <!-- QUYỀN TRUY CẬP BỘ NHỚ VÀ MẠNG -->
+    <!-- Quyền đọc bộ nhớ (dùng cho debug/ảnh mẫu nếu cần) -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
+    
+    <!-- Quyền mạng (bắt buộc để gửi ảnh qua Socket) -->
     <uses-permission android:name="android.permission.INTERNET" />
 
     <application
@@ -23,6 +26,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.AppCompat.Light.NoActionBar">
 
+        <!-- Màn hình chính -->
         <activity
             android:name=".MainActivity"
             android:exported="true">
@@ -32,17 +36,18 @@
             </intent-filter>
         </activity>
 
-        <!-- Khai báo Service chụp màn hình -->
+        <!-- Service chụp màn hình (Client) -->
         <service
             android:name=".FloatingService"
             android:exported="false"
             android:foregroundServiceType="mediaProjection" />
 
-        <!-- KHAI BÁO THÊM SERVICE MENU (MỚI) -->
+        <!-- Service hiển thị menu nổi -->
         <service
             android:name=".FloatingMenuService"
             android:exported="false" />
 
+        <!-- Provider của Shizuku -->
         <provider
             android:name="rikka.shizuku.ShizukuProvider"
             android:authorities="${applicationId}.shizuku"

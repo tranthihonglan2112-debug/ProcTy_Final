@@ -22,7 +22,7 @@
         <androidx.cardview.widget.CardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="40dp"
+            android:layout_marginBottom="30dp"
             app:cardBackgroundColor="#CC0A0A14"
             app:cardCornerRadius="20dp"
             app:cardElevation="15dp"
@@ -58,6 +58,41 @@
                     android:letterSpacing="0.15" />
             </LinearLayout>
         </androidx.cardview.widget.CardView>
+
+        <!-- Ô NHẬP IP SERVER -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="20dp"
+            android:gravity="center_vertical">
+
+            <EditText
+                android:id="@+id/edtServerIp"
+                android:layout_width="0dp"
+                android:layout_height="50dp"
+                android:layout_weight="1"
+                android:background="#CC1A1A2E"
+                android:hint="Nhập IP Máy Tính (VD: 192.168.1.5)"
+                android:textColorHint="#888888"
+                android:textColor="#00D2FF"
+                android:padding="12dp"
+                android:textSize="14sp"
+                android:inputType="text"
+                android:singleLine="true" />
+
+            <Button
+                android:id="@+id/btnSaveIp"
+                android:layout_width="wrap_content"
+                android:layout_height="50dp"
+                android:layout_marginLeft="8dp"
+                android:background="@drawable/bg_button_secondary"
+                android:text="LƯU IP"
+                android:textColor="#00D2FF"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:stateListAnimator="@null" />
+        </LinearLayout>
 
         <Button
             android:id="@+id/btnCheckShizuku"

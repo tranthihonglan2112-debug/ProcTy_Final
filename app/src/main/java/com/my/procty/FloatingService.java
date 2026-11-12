@@ -7,6 +7,7 @@ import android.app.Service;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.ServiceInfo;
+import android.graphics.Bitmap;
 import android.graphics.PixelFormat;
 import android.graphics.drawable.GradientDrawable;
 import android.hardware.display.DisplayManager;
@@ -31,69 +32,26 @@ import android.view.WindowManager;
 import androidx.core.app.NotificationCompat;
 import java.io.File;
 import java.io.FileWriter;
-import java.io.InputStream;
 import java.nio.ByteBuffer;
 
 public class FloatingService extends Service {
-    static {
-        System.loadLibrary("procty");
-    }
-
-    private native boolean nativeLoadTemplate(byte[] templateData);
-    private native boolean nativeCalibStore(ByteBuffer buffer, int fullW, int fullH, int rowStride, int slot);
-    private native long nativeCalibShift(int axis);
-    private native long nativeFindTarget(ByteBuffer buffer, int fullW, int fullH, int rowStride,
-                                         int roiX, int roiY, int roiW, int roiH,
-                                         int mode, int cR, int cG, int cB);
-
     private static final String TAG_FRAME = "ProcTyFrame";
     private static final String TAG_ERROR = "ProcTyError";
-
     private static final boolean REQUIRE_LANDSCAPE = true;
 
-    private static final int SWIPE_START_X = 1299;      
+    // --- CẤU HÌNH MẠNG ---
+    private static final int SERVER_PORT = 12345;
+    private String serverIp = "192.168.1.5"; // Giá trị mặc định
+
+    // --- CẤU HÌNH VUỐT ---
+    private static final int SWIPE_START_X = 1299;
     private static final int SWIPE_START_Y = 360;
-    private static final double DAMP = 1.0;
-    private static final double MAX_DRAG_PX = 450.0;
-    // Cử chỉ phải kéo dài >= 3-4 khung hình game (~60ms). Bản cũ 2 bước x 8ms = ~24ms: DOWN/MOVE/UP
-    // dồn vào 1-2 khung -> game đọc delta theo khung sẽ nuốt mất MOVE => "rất ít khi vuốt / giật".
-    private static final int SWIPE_STEPS = 8;    // d + 7 MOVE + u
-    // 16ms/buoc: moi MOVE roi vao DUNG 1 khung vsync (16.7ms) rieng -> khong bi gop batch.
-    // Tong ~128ms >= 7-8 khung game @60fps (code cu 5 x 10ms = 50ms ~ 3 khung -> bi gop con 2-3 nac).
+    private static final int SWIPE_STEPS = 8;
     private static final int SWIPE_STEP_MS = 16;
-    // Chỉ để KHÔNG CHỒNG 2 cử chỉ lên nhau (không phải vùng chết): cử chỉ trước chạy ~144ms.
     private static final long MIN_SWIPE_INTERVAL_MS = (SWIPE_STEPS + 1) * SWIPE_STEP_MS + 60;
 
-    // ---- Hiệu chuẩn ----
-    private static final int CAL_STEPS = 6;
-    private static final int CAL_STEP_MS = 14;                  // ~100ms/cử chỉ để game kịp ghi nhận
-    private static final int[] CAL_DRAGS = {60, 120, 30, 90};   // thử nhiều cỡ: quá nhỏ (<dead-zone) hoặc quá lớn (>nửa tile) đều hỏng
-    private static final int CAL_NEED_OK = 2;                   // cần 2 lần đo nhất quán / trục
-    private static final int CAL_MAX_TRIES = CAL_DRAGS.length;
-    private static final long CAL_SETTLE_MS = 600;
-    // FALLBACK khi đo hỏng. g LỚN = vuốt NGẮN -> sai thì chỉ hội tụ chậm, KHÔNG dao động/giật.
-    // (g quá nhỏ mới gây vượt đích rồi giật qua lại). Tinh chỉnh theo log ProcTyTarget.
-    private static final double FALLBACK_G = 2.0;
-    private static final double FALLBACK_DAMP = 0.8;
-
-    // [BƯỚC 1] Chấm debug nằm TRONG ảnh chụp -> che đầu mục tiêu -> nhận diện hụt. Mặc định TẮT khi chạy thật.
-    // Bật để xem: đổi DEBUG_DOTS_DEFAULT = true (hoặc prefs "debug_dots" = true).
     private static final boolean DEBUG_DOTS_DEFAULT = false;
     private volatile boolean debugDots = DEBUG_DOTS_DEFAULT;
-
-    // [BƯỚC 3] Theo dõi mục tiêu: thấy rồi thì lần sau chỉ quét ô nhỏ quanh vị trí cũ.
-    private static final int TRACK_BOX = 160;
-    private boolean trackValid = false;
-    private int trackX = 0, trackY = 0;
-
-    // [BƯỚC 4] Tự học g: so độ lệch trước/sau mỗi cú vuốt.
-    private static final int LEARN_MIN_DRAG = 4;
-    private boolean swipeLearnValid = false;
-    private int prevRelX, prevRelY, prevDragX, prevDragY;
-    private int learnOk = 0;
-    private long scanMaxNs = 0;
-    private int scanHit = 0;
-
     private static final int FF_CROSSHAIR_X = 800;
     private static final int FF_CROSSHAIR_Y = 360;
 
@@ -101,9 +59,9 @@ public class FloatingService extends Service {
 
     private WindowManager windowManager;
     private View roiView;
-    private View debugDotView; 
-    private View debugCenterView; 
-    
+    private View debugDotView;
+    private View debugCenterView;
+
     private DisplayManager displayManager;
     private MediaProjection mediaProjection;
     private volatile VirtualDisplay virtualDisplay;
@@ -117,18 +75,10 @@ public class FloatingService extends Service {
     private int captureDpi = 0;
 
     private volatile boolean isScanning = false;
-    private long frameCount = 0;
     private long lastSwipeUptime = 0;
-
     private SharedPreferences prefs;
-    private final int roiBoxSize = 300; 
+    private final int roiBoxSize = 300;
 
-    // ===== HỆ TOẠ ĐỘ =====
-    // CAPTURE-SPACE = toạ độ pixel của ảnh MediaProjection (= toạ độ vuốt MaaTouch) = "sự thật" duy nhất.
-    // roiRealX/Y, FF_CROSSHAIR_*, targetX/Y đều là capture-space.
-    // OVERLAY-SPACE = toạ độ params.x/y của WindowManager. Có thể lệch capture-space một đoạn
-    // (ovOffX, ovOffY) nếu hệ thống trừ tai thỏ / thanh trạng thái khỏi vùng layout.
-    // Quy tắc: CHỈ đổi sang overlay-space ở khâu VẼ:  params.x = capX - ovOffX.
     private volatile int roiRealX = 0;
     private volatile int roiRealY = 0;
     private volatile int ovOffX = 0;
@@ -136,57 +86,38 @@ public class FloatingService extends Service {
     private WindowManager.LayoutParams roiParams;
     private final Handler uiHandler = new Handler(Looper.getMainLooper());
 
-    private byte[] cachedTemplateData = null;
-
-    private double aimGx = 0, aimGy = 0;
-    private int calAxis = 0, calTry = 0, calPhase = 0, calSign = 1, calDrag = 0;
-    private boolean calOkX = false, gTrusted = false;
-    private long calReadyAt = 0;
-    private final double[] calG = new double[CAL_MAX_TRIES];
-    private int calGn = 0;
-    private boolean maaRestartTried = false;
-    private long scanNs = 0;
-    private int scanN = 0;
-    private int lastLoadedMode = -1;
-
-    // ===== MAY DEM CHUNG MINH: tai sao khong vuot? =====
-    private long gFrameSkip, gCalBusy, gNoDetect, gOnTarget, gThrottle, gDropped, gSwiped;
-    private void logGates() {
-        Log.d("ProcTyGate", "frames: bo_qua_6=" + gFrameSkip
-                + " | calibration_chiem=" + gCalBusy
-                + " | khong_nhan_dien=" + gNoDetect
-                + " | da_trung_tam=" + gOnTarget
-                + " | cho_cu_truoc=" + gThrottle
-                + " | MaaTouch_chua_san_sang=" + gDropped
-                + " | DA_VUOT=" + gSwiped);
-    }
+    private static final long PROCESS_INTERVAL_MS = 50;
+    private final Object imgLock = new Object();
+    private Image heldImage = null;
+    private long lastProcessUptime = 0;
+    private volatile boolean tickRunning = false;
+    private SocketClient socketClient;
 
     @Override
-    public IBinder onBind(Intent intent) {
-        return null;
-    }
+    public IBinder onBind(Intent intent) { return null; }
 
     @Override
     public void onCreate() {
         installCrashLogger();
         super.onCreate();
         prefs = getSharedPreferences("proc_ty_settings", MODE_PRIVATE);
-        aimGx = prefs.getFloat("aim_gx", 0f);
-        aimGy = prefs.getFloat("aim_gy", 0f);
-        gTrusted = aimGx != 0 && aimGy != 0;
         windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
 
         try {
             displayManager = (DisplayManager) getSystemService(DISPLAY_SERVICE);
-
             captureThread = new HandlerThread("ProcTyCapture");
             captureThread.start();
             captureHandler = new Handler(captureThread.getLooper());
-
             startForegroundWithAppropriateType();
-
             MinitouchController.init(this);
-
+            
+            // Đọc IP đã lưu từ SharedPreferences
+            SharedPreferences appPrefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
+            serverIp = appPrefs.getString("server_ip", "192.168.1.5");
+            
+            // Khởi tạo kết nối Socket tới máy tính
+            socketClient = new SocketClient(serverIp, SERVER_PORT);
+            
         } catch (Exception e) {
             Log.e(TAG_ERROR, "Lỗi onCreate: " + e, e);
         }
@@ -195,28 +126,19 @@ public class FloatingService extends Service {
     private void installCrashLogger() {
         if (crashHandlerInstalled) return;
         crashHandlerInstalled = true;
-
         File base = getExternalFilesDir(null);
         if (base == null) base = getFilesDir();
         final File logFile = new File(base, "crash_log.txt");
         final Thread.UncaughtExceptionHandler previous = Thread.getDefaultUncaughtExceptionHandler();
-
         Thread.setDefaultUncaughtExceptionHandler((t, e) -> {
             try {
                 FileWriter writer = new FileWriter(logFile);
                 writer.write("CRASH: " + e.toString() + "\n");
-                for (StackTraceElement ste : e.getStackTrace()) {
-                    writer.write("at " + ste.toString() + "\n");
-                }
+                for (StackTraceElement ste : e.getStackTrace()) writer.write("at " + ste.toString() + "\n");
                 writer.close();
             } catch (Exception ignored) {}
-
-            if (previous != null) {
-                previous.uncaughtException(t, e);
-            } else {
-                android.os.Process.killProcess(android.os.Process.myPid());
-                System.exit(1);
-            }
+            if (previous != null) previous.uncaughtException(t, e);
+            else { android.os.Process.killProcess(android.os.Process.myPid()); System.exit(1); }
         });
     }
 
@@ -235,7 +157,6 @@ public class FloatingService extends Service {
             if (intent != null && mediaProjection == null) {
                 int resultCode = intent.getIntExtra("code", 0);
                 Intent data = intent.getParcelableExtra("data");
-
                 if (resultCode != 0 && data != null) {
                     MediaProjectionManager projectionManager = (MediaProjectionManager) getSystemService(MEDIA_PROJECTION_SERVICE);
                     if (projectionManager != null) {
@@ -243,17 +164,11 @@ public class FloatingService extends Service {
                         if (mediaProjection != null) {
                             mediaProjection.registerCallback(projectionCallback, captureHandler);
                             initScreenCapture();
-                        } else {
-                            Log.e(TAG_ERROR, "getMediaProjection() trả về null");
                         }
                     }
-                } else {
-                    Log.e(TAG_ERROR, "Thiếu code/data MediaProjection trong Intent (code=" + resultCode + ")");
                 }
             }
-        } catch (Exception e) {
-            Log.e(TAG_ERROR, "Lỗi onStartCommand: " + e, e);
-        }
+        } catch (Exception e) { Log.e(TAG_ERROR, "Lỗi onStartCommand: " + e, e); }
         return START_NOT_STICKY;
     }
 
@@ -264,10 +179,9 @@ public class FloatingService extends Service {
             NotificationManager manager = getSystemService(NotificationManager.class);
             if (manager != null) manager.createNotificationChannel(channel);
         }
-
         return new NotificationCompat.Builder(this, channelId)
-                .setContentTitle("ProcTy AI Active")
-                .setContentText("Mắt thần đang hoạt động...")
+                .setContentTitle("ProcTy Client Active")
+                .setContentText("Đang gửi ảnh tới Server...")
                 .setSmallIcon(android.R.drawable.ic_menu_compass)
                 .build();
     }
@@ -295,136 +209,81 @@ public class FloatingService extends Service {
     private synchronized void initScreenCapture() {
         try {
             int[] size = queryDisplaySize();
-            captureWidth = size[0];
-            captureHeight = size[1];
-            captureDpi = size[2];
-
+            captureWidth = size[0]; captureHeight = size[1]; captureDpi = size[2];
             ImageReader reader = createReader(captureWidth, captureHeight);
             imageReader = reader;
-
             virtualDisplay = mediaProjection.createVirtualDisplay(
                     "ProcTyScreenCapture", captureWidth, captureHeight, captureDpi,
                     DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR, reader.getSurface(),
                     virtualDisplayCallback, captureHandler
             );
-
-            if (virtualDisplay == null) {
-                Log.e(TAG_ERROR, "createVirtualDisplay() trả về null");
-                return;
-            }
+            if (virtualDisplay == null) return;
 
             displayManager.registerDisplayListener(displayListener, captureHandler);
-            Log.i(TAG_FRAME, "Capture sẵn sàng: " + captureWidth + "x" + captureHeight + " @" + captureDpi + "dpi");
-
             drawRoiBox(captureWidth, captureHeight);
-
             tickRunning = true;
             captureHandler.removeCallbacks(idleTick);
             captureHandler.postDelayed(idleTick, PROCESS_INTERVAL_MS);
-
-        } catch (Exception e) {
-            Log.e(TAG_ERROR, "Lỗi initScreenCapture: " + e, e);
-        }
+        } catch (Exception e) { Log.e(TAG_ERROR, "Lỗi initScreenCapture: " + e, e); }
     }
-    
-    /**
-     * LayoutParams cho overlay: neo vào MÀN HÌNH VẬT LÝ chứ không phải vùng "an toàn".
-     * Thiếu FLAG_LAYOUT_IN_SCREEN | FLAG_LAYOUT_NO_LIMITS và layoutInDisplayCutoutMode thì
-     * WindowManager tính (0,0) từ mép trong của tai thỏ / thanh trạng thái -> mọi overlay bị lệch.
-     */
+
     private WindowManager.LayoutParams newOverlayParams(int w, int h) {
         int type = (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
-                ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-                : WindowManager.LayoutParams.TYPE_PHONE;
+                ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY : WindowManager.LayoutParams.TYPE_PHONE;
         WindowManager.LayoutParams p = new WindowManager.LayoutParams(
                 w, h, type,
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
-                        | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-                        | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
-                        | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+                        | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
                 PixelFormat.TRANSLUCENT);
         p.gravity = Gravity.TOP | Gravity.LEFT;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            p.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS;
-        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            p.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
-        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) p.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS;
+        else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) p.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
         return p;
     }
 
     private View makeDot(int fill, int stroke, int strokePx) {
         View v = new View(this);
         GradientDrawable circle = new GradientDrawable();
-        circle.setShape(GradientDrawable.OVAL);
-        circle.setColor(fill);
-        circle.setStroke(strokePx, stroke);
+        circle.setShape(GradientDrawable.OVAL); circle.setColor(fill); circle.setStroke(strokePx, stroke);
         v.setBackground(circle);
         return v;
     }
 
-    /** Đặt tâm một overlay đúng vào điểm (capX, capY) của CAPTURE-SPACE. Gọi trên UI thread. */
     private void placeCentered(View v, int capX, int capY, int size) {
         if (v == null || windowManager == null) return;
         try {
             WindowManager.LayoutParams p = (WindowManager.LayoutParams) v.getLayoutParams();
-            p.x = capX - size / 2 - ovOffX;
-            p.y = capY - size / 2 - ovOffY;
+            p.x = capX - size / 2 - ovOffX; p.y = capY - size / 2 - ovOffY;
             windowManager.updateViewLayout(v, p);
-        } catch (Exception e) {
-            Log.e(TAG_ERROR, "Lỗi đặt overlay: " + e.getMessage());
-        }
+        } catch (Exception ignored) {}
     }
 
     private void drawRoiBox(int screenW, int screenH) {
-        // ROI trong CAPTURE-SPACE: tâm ROI = đúng tâm súng. KHÔNG đọc lại từ getLocationOnScreen.
-        // Gán ĐỒNG BỘ (trước khi post) để luồng capture không bao giờ thấy ROI = (0,0).
         roiRealX = FF_CROSSHAIR_X - roiBoxSize / 2;
         roiRealY = FF_CROSSHAIR_Y - roiBoxSize / 2;
-
         uiHandler.post(() -> {
             try {
                 if (roiView != null) return;
-
                 roiView = new View(this);
                 GradientDrawable border = new GradientDrawable();
-                border.setColor(0x00000000);
-                border.setStroke(5, 0xFF00D2FF);
+                border.setColor(0x00000000); border.setStroke(5, 0xFF00D2FF);
                 roiView.setBackground(border);
-
                 roiParams = newOverlayParams(roiBoxSize, roiBoxSize);
-                roiParams.x = roiRealX - ovOffX;
-                roiParams.y = roiRealY - ovOffY;
+                roiParams.x = roiRealX - ovOffX; roiParams.y = roiRealY - ovOffY;
                 windowManager.addView(roiView, roiParams);
-
-                // Đo độ lệch overlay-space <-> capture-space SAU MỖI LẦN layout (kể cả khi xoay màn hình).
-                roiView.getViewTreeObserver().addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
-                    @Override
-                    public void onGlobalLayout() {
-                        if (roiView == null || roiParams == null) return;
-                        int[] loc = new int[2];
-                        roiView.getLocationOnScreen(loc);
-                        int offX = loc[0] - roiParams.x;
-                        int offY = loc[1] - roiParams.y;
-                        if (offX != ovOffX || offY != ovOffY) {
-                            Log.w(TAG_FRAME, "Overlay lệch (" + offX + "," + offY + ") px so với màn hình thật"
-                                    + " -> bù khi vẽ (ROI quét vẫn đúng toạ độ capture)");
-                            ovOffX = offX;
-                            ovOffY = offY;
-                            repositionOverlays();
-                        }
+                roiView.getViewTreeObserver().addOnGlobalLayoutListener(() -> {
+                    if (roiView == null || roiParams == null) return;
+                    int[] loc = new int[2]; roiView.getLocationOnScreen(loc);
+                    int offX = loc[0] - roiParams.x; int offY = loc[1] - roiParams.y;
+                    if (offX != ovOffX || offY != ovOffY) {
+                        ovOffX = offX; ovOffY = offY; repositionOverlays();
                     }
                 });
-
                 showDebugCenter(FF_CROSSHAIR_X, FF_CROSSHAIR_Y);
-                Log.i(TAG_FRAME, "ROI capture-space: góc=(" + roiRealX + "," + roiRealY + ") tâm=("
-                        + FF_CROSSHAIR_X + "," + FF_CROSSHAIR_Y + ") màn hình=" + screenW + "x" + screenH);
-            } catch (Exception e) {
-                Log.e(TAG_ERROR, "Lỗi vẽ khung ROI: " + e.getMessage());
-            }
+            } catch (Exception ignored) {}
         });
     }
 
-    /** Vẽ lại khung xanh + chấm vàng theo độ lệch hiện tại (sau xoay màn hình / đổi inset). */
     private void removeDebugDots() {
         if (windowManager == null) return;
         if (debugDotView != null) { try { windowManager.removeView(debugDotView); } catch (Exception ignored) {} debugDotView = null; }
@@ -435,18 +294,14 @@ public class FloatingService extends Service {
         uiHandler.post(() -> {
             if (roiView != null && roiParams != null) {
                 try {
-                    roiParams.x = roiRealX - ovOffX;
-                    roiParams.y = roiRealY - ovOffY;
+                    roiParams.x = roiRealX - ovOffX; roiParams.y = roiRealY - ovOffY;
                     windowManager.updateViewLayout(roiView, roiParams);
-                } catch (Exception e) {
-                    Log.e(TAG_ERROR, "Lỗi dời khung ROI: " + e.getMessage());
-                }
+                } catch (Exception ignored) {}
             }
             placeCentered(debugCenterView, FF_CROSSHAIR_X, FF_CROSSHAIR_Y, 16);
         });
     }
 
-    /** Chấm VÀNG = tâm súng (FF_CROSSHAIR) trong CAPTURE-SPACE. */
     private void showDebugCenter(final int capX, final int capY) {
         if (!debugDots) return;
         uiHandler.post(() -> {
@@ -456,13 +311,10 @@ public class FloatingService extends Service {
                     windowManager.addView(debugCenterView, newOverlayParams(16, 16));
                 }
                 placeCentered(debugCenterView, capX, capY, 16);
-            } catch (Exception e) {
-                Log.e(TAG_ERROR, "Lỗi vẽ chấm tâm: " + e.getMessage());
-            }
+            } catch (Exception ignored) {}
         });
     }
 
-    /** Chấm ĐỎ = điểm Neo (capX, capY) trong CAPTURE-SPACE. An toàn khi gọi từ luồng capture. */
     private void showDebugDot(final int capX, final int capY) {
         if (!debugDots) return;
         uiHandler.post(() -> {
@@ -472,29 +324,13 @@ public class FloatingService extends Service {
                     windowManager.addView(debugDotView, newOverlayParams(20, 20));
                 }
                 placeCentered(debugDotView, capX, capY, 20);
-            } catch (Exception e) {
-                Log.e(TAG_ERROR, "Lỗi vẽ chấm debug: " + e.getMessage());
-            }
+            } catch (Exception ignored) {}
         });
     }
 
-    // ===== VÒNG LẶP ĐỘC LẬP VỚI KHUNG HÌNH =====
-    // VirtualDisplay CHỈ đẩy khung mới khi màn hình có thay đổi. Màn hình đứng yên (chấm đỏ đứng yên,
-    // cảnh không đổi) => onImageAvailable KHÔNG được gọi nữa => bản cũ không bao giờ kiểm tra lại,
-    // cú vuốt cuối bị throttle/bỏ qua rồi im luôn. Giải pháp: GIỮ khung mới nhất và xử lý lại theo đồng hồ.
-    private static final long PROCESS_INTERVAL_MS = 50;
-    private final Object imgLock = new Object();
-    private Image heldImage = null;
-    private long lastProcessUptime = 0;
-    private volatile boolean tickRunning = false;
-
     private final ImageReader.OnImageAvailableListener frameListener = reader -> {
         Image fresh = null;
-        try {
-            fresh = reader.acquireLatestImage();
-        } catch (Exception e) {
-            Log.e(TAG_ERROR, "acquireLatestImage lỗi: " + e);
-        }
+        try { fresh = reader.acquireLatestImage(); } catch (Exception ignored) {}
         if (fresh == null) return;
         synchronized (imgLock) {
             if (heldImage != null) { try { heldImage.close(); } catch (Exception ignored) {} }
@@ -507,7 +343,7 @@ public class FloatingService extends Service {
         @Override
         public void run() {
             if (!tickRunning) return;
-            processHeldFrame();                      // khung đứng yên vẫn được xử lý lại
+            processHeldFrame();
             Handler h = captureHandler;
             if (h != null && tickRunning) h.postDelayed(this, PROCESS_INTERVAL_MS);
         }
@@ -517,7 +353,7 @@ public class FloatingService extends Service {
         long nowMs = SystemClock.uptimeMillis();
         synchronized (imgLock) {
             if (heldImage == null) return;
-            if (nowMs - lastProcessUptime < PROCESS_INTERVAL_MS) { gFrameSkip++; return; }
+            if (nowMs - lastProcessUptime < PROCESS_INTERVAL_MS) return;
             lastProcessUptime = nowMs;
             processFrame(heldImage);
         }
@@ -530,391 +366,113 @@ public class FloatingService extends Service {
             boolean portrait = imgW < imgH;
 
             isScanning = prefs.getBoolean("is_scanning", false);
-            int mode = prefs.getInt("mode", 1);
-            int cR = prefs.getInt("color_r", 200);
-            int cG = prefs.getInt("color_g", 50);
-            int cB = prefs.getInt("color_b", 50);
-
             boolean wantDots = prefs.getBoolean("debug_dots", DEBUG_DOTS_DEFAULT);
             if (wantDots != debugDots) {
                 debugDots = wantDots;
-                uiHandler.post(() -> {
-                    if (!debugDots) removeDebugDots(); else showDebugCenter(FF_CROSSHAIR_X, FF_CROSSHAIR_Y);
-                });
+                uiHandler.post(() -> { if (!debugDots) removeDebugDots(); else showDebugCenter(FF_CROSSHAIR_X, FF_CROSSHAIR_Y); });
             }
 
-            if (!isScanning) return; 
-            if (REQUIRE_LANDSCAPE && portrait) return;
+            if (!isScanning || (REQUIRE_LANDSCAPE && portrait)) return;
 
             Image.Plane[] planes = image.getPlanes();
             if (planes == null || planes.length == 0) return;
 
             ByteBuffer buffer = planes[0].getBuffer();
             int rowStride = planes[0].getRowStride();
+            int pixelStride = planes[0].getPixelStride();
 
             final int roiInset = 5;
-            final int fullX = roiRealX + roiInset;
-            final int fullY = roiRealY + roiInset;
-            final int fullSize = roiBoxSize - 2 * roiInset;
-            int roiX = fullX, roiY = fullY, roiW = fullSize, roiH = fullSize;
-            boolean usedSmall = false;
-            if (trackValid && mode == 2) {   // đã thấy mục tiêu -> chỉ quét ô nhỏ quanh vị trí cũ
-                roiW = Math.min(TRACK_BOX, fullSize);
-                roiH = roiW;
-                roiX = Math.max(fullX, Math.min(fullX + fullSize - roiW, trackX - roiW / 2));
-                roiY = Math.max(fullY, Math.min(fullY + fullSize - roiH, trackY - roiH / 2));
-                usedSmall = true;
-            }
-            if (roiX < 0 || roiY < 0 || roiX + roiW > imgW || roiY + roiH > imgH) {
-                Log.e(TAG_ERROR, "ROI nằm ngoài khung hình: roi=(" + roiX + "," + roiY + " " + roiW + "x" + roiH
-                        + ") khung=" + imgW + "x" + imgH);
-                return;
-            }
+            final int roiX = roiRealX + roiInset;
+            final int roiY = roiRealY + roiInset;
+            final int roiW = roiBoxSize - 2 * roiInset;
+            final int roiH = roiBoxSize - 2 * roiInset;
 
-            if (calibrateStep(buffer, imgW, imgH, rowStride)) { gCalBusy++; if (gCalBusy % 30 == 1) logGates(); return; }
+            if (roiX < 0 || roiY < 0 || roiX + roiW > imgW || roiY + roiH > imgH) return;
 
-            if (mode == 2) {
-                if (lastLoadedMode != 2 || cachedTemplateData == null) {
-                    File tplFile = new File("/storage/emulated/0/Download/head_front.png");
-                    if (tplFile.exists()) {
-                        try {
-                            byte[] data = java.nio.file.Files.readAllBytes(tplFile.toPath()); 
-                            if (nativeLoadTemplate(data)) {   
-                                cachedTemplateData = data;
-                                lastLoadedMode = 2;
-                                Log.d(TAG_FRAME, "Đã nạp ảnh mẫu (" + data.length + " byte)");
-                            } else {
-                                Log.e(TAG_ERROR, "C++ KHÔNG giải mã được ảnh mẫu (" + data.length + " byte): " + tplFile);
-                            }
-                        } catch (Exception e) {
-                            Log.e(TAG_ERROR, "Lỗi đọc ảnh mẫu: " + e.getMessage());
-                        }
-                    } else {
-                        Log.e(TAG_ERROR, "Không tìm thấy file ảnh mẫu!");
-                    }
-                }
-            } else {
-                if (lastLoadedMode != 1) {
-                    nativeLoadTemplate(null); 
-                    lastLoadedMode = 1;
-                }
-            }
+            // TẠO BITMAP CHUẨN XÁC TỪ BUFFER (CHỈ CẮT VÙNG ROI 300X300)
+            Bitmap bitmap = Bitmap.createBitmap(roiW, roiH, Bitmap.Config.ARGB_8888);
+            int startOffset = (roiY * rowStride) + (roiX * pixelStride);
+            buffer.position(startOffset);
+            bitmap.copyPixelsFromBuffer(buffer);
 
-            long t0 = System.nanoTime();
-            long result = nativeFindTarget(buffer, imgW, imgH, rowStride, roiX, roiY, roiW, roiH, mode, cR, cG, cB);
-            long dtNs = System.nanoTime() - t0;
-            scanNs += dtNs;
-            if (dtNs > scanMaxNs) scanMaxNs = dtNs;
-            if (result != 0) scanHit++;
-            if (++scanN >= 30) {
-                Log.d("ProcTyPerf", "so khớp TB " + (scanNs / scanN) / 1000000.0 + " ms | max "
-                        + scanMaxNs / 1000000.0 + " ms | thấy " + scanHit + "/30 | ROI " + roiW + "px"
-                        + (usedSmall ? " (theo dõi)" : " (quét đủ)"));
-                scanN = 0; scanNs = 0; scanMaxNs = 0; scanHit = 0;
-            }
-
-            if (result == 0) {
-                gNoDetect++;
-                trackValid = false;          // mất dấu -> khung sau quét đủ ROI
-                swipeLearnValid = false;     // không học g qua khung hụt
-            }
-            int[] delta = AnchorMath.decodeDelta(result);
-            if (delta != null) {
-                final int deltaX = delta[0];   // Neo - TÂM ROI (do C++ trả về)
-                final int deltaY = delta[1];
-
-                // Toạ độ tuyệt đối của Neo trên màn hình = TÂM ROI + delta.
-                // (Bản lỗi dùng roiRealX + deltaX = GỐC ROI + delta -> lệch (-150,-150) px.)
-                int[] tgt = AnchorMath.toScreen(roiX, roiY, roiW, roiH, deltaX, deltaY);
-                int targetX = tgt[0];
-                int targetY = tgt[1];
-                trackValid = true; trackX = targetX; trackY = targetY;
-
-                // CHẤM ĐỎ DEBUG: nằm đúng trên điểm Neo
-                showDebugDot(targetX, targetY);
-
-                // Độ lệch Neo so với TÂM SÚNG: đây mới là thứ cần vuốt để triệt tiêu.
-                int relativeDeltaX = targetX - FF_CROSSHAIR_X;
-                int relativeDeltaY = targetY - FF_CROSSHAIR_Y;
-
-                long now = SystemClock.uptimeMillis();
-
-                // [BƯỚC 4] Cảnh đã ổn định sau cú vuốt trước -> đo xem nó thực sự giảm lệch bao nhiêu.
-                if (swipeLearnValid && now - lastSwipeUptime >= MIN_SWIPE_INTERVAL_MS) {
-                    learnGain(relativeDeltaX, relativeDeltaY);
-                    swipeLearnValid = false;
-                }
-
-                // BẮT BUỘC VUỐT: chỉ dừng khi chấm vàng ĐÈ HẲN lên chấm đỏ (lệch đúng 0px cả 2 trục).
-                if (relativeDeltaX == 0 && relativeDeltaY == 0) {
-                    gOnTarget++;
-                    if (gOnTarget % 30 == 1) logGates();
-                    return;
-                }
-
-                if (now - lastSwipeUptime < MIN_SWIPE_INTERVAL_MS) {   // cử chỉ trước chưa xong
-                    gThrottle++;
-                    if (gThrottle % 30 == 1) logGates();
-                    return;
-                }
-
-                int[] end = AimMath.relativeEnd(SWIPE_START_X, SWIPE_START_Y, relativeDeltaX, relativeDeltaY,
-                        aimGx, aimGy, gTrusted ? DAMP : FALLBACK_DAMP, MAX_DRAG_PX, imgW, imgH);
-
-                // Luôn vuốt (không còn hủy cú vuốt ngắn). Chỉ chốt giờ khi lệnh THỰC SỰ được gửi.
-                boolean sent = MinitouchController.swipePath(
-                        AimMath.easedPath(SWIPE_START_X, SWIPE_START_Y, end[0], end[1], SWIPE_STEPS), SWIPE_STEP_MS);
-                if (!sent) {
-                    gDropped++;
-                    if (gDropped % 30 == 1) logGates();
-                    return;
-                }
+            // Gửi ảnh qua Socket
+            long now = SystemClock.uptimeMillis();
+            if (now - lastSwipeUptime >= MIN_SWIPE_INTERVAL_MS) {
                 lastSwipeUptime = now;
-                gSwiped++;
-                prevRelX = relativeDeltaX; prevRelY = relativeDeltaY;
-                prevDragX = end[0] - SWIPE_START_X; prevDragY = end[1] - SWIPE_START_Y;
-                swipeLearnValid = true;
-                Log.d("ProcTyTarget", "roi=(" + roiX + "," + roiY + " " + roiW + "x" + roiH + ")"
-                        + " delta=(" + deltaX + "," + deltaY + ")"
-                        + " target=(" + targetX + "," + targetY + ")"
-                        + " rel=(" + relativeDeltaX + "," + relativeDeltaY + ")"
-                        + " g=(" + aimGx + "," + aimGy + (gTrusted ? ")" : ")[DỰ PHÒNG]")
-                        + " -> vuốt " + SWIPE_START_X + "," + SWIPE_START_Y + " => " + end[0] + "," + end[1]);
-            }
-        } catch (Exception e) {
-            Log.e(TAG_ERROR, "Lỗi frame: " + e, e);
-        }
-    }
-
-    /** g_mới = (độ lệch giảm được) / (px ngón tay đã vuốt). Chỉ nhận mẫu hợp lý, trộn dần (EMA). */
-    private void learnGain(int relX, int relY) {
-        if (Math.abs(prevDragX) >= LEARN_MIN_DRAG) aimGx = blendGain(aimGx, (prevRelX - relX) / (double) prevDragX, "X");
-        if (Math.abs(prevDragY) >= LEARN_MIN_DRAG) aimGy = blendGain(aimGy, (prevRelY - relY) / (double) prevDragY, "Y");
-    }
-
-    private double blendGain(double g, double est, String axis) {
-        if (g == 0 || Double.isNaN(est)) return g;
-        double ratio = est / g;
-        if (ratio < 0.4 || ratio > 2.5) return g;          // mẫu lạ (mục tiêu tự chạy, cảnh chưa yên...) -> bỏ
-        double ng = 0.6 * g + 0.4 * est;
-        if (++learnOk >= 3) gTrusted = true;               // đã tự kiểm chứng -> dùng DAMP đầy đủ
-        Log.d("ProcTyLearn", "g" + axis + ": " + g + " -> " + ng + " (mẫu " + est + ")");
-        return ng;
-    }
-
-    private boolean calibrateStep(ByteBuffer buffer, int imgW, int imgH, int rowStride) {
-        if (aimGx != 0 && aimGy != 0) return false;
-        if (!MinitouchController.isReady()) {
-            MinitouchController.ensureStarted();
-            return true;
-        }
-
-        long now = SystemClock.uptimeMillis();
-        boolean horizontal = (calAxis == 0);
-
-        if (calPhase == 0) {
-            if (calAxis == 0 && calTry == 0) {
-                int mx = MinitouchController.getMaxX(), my = MinitouchController.getMaxY();
-                // minitouch báo max = kích thước-1 trên một số máy -> cho phép lệch 1px
-                if (mx > 0 && (Math.abs(mx - imgW) > 1 || Math.abs(my - imgH) > 1)) {
-                    Log.e(TAG_ERROR, "MaaTouch dùng toạ độ " + mx + "x" + my + " nhưng khung chụp là " + imgW + "x" + imgH
-                            + " => toạ độ vuốt sẽ SAI. " + (maaRestartTried ? "Đã khởi động lại 1 lần mà vẫn lệch." : "Khởi động lại MaaTouch."));
-                    if (!maaRestartTried) {
-                        maaRestartTried = true;
-                        MinitouchController.close();
-                        MinitouchController.init(this);
-                        return true;
+                socketClient.sendFrame(bitmap, roiX, roiY, roiW, roiH, (targetX, targetY) -> {
+                    if (targetX != -1 && targetY != -1) {
+                        showDebugDot(targetX, targetY);
+                        MinitouchController.swipePath(
+                                AimMath.easedPath(SWIPE_START_X, SWIPE_START_Y, targetX, targetY, SWIPE_STEPS),
+                                SWIPE_STEP_MS
+                        );
                     }
-                }
+                });
             }
-            if (!nativeCalibStore(buffer, imgW, imgH, rowStride, 0)) return true;
-            calSign = ((calTry % 2) == 0) ? 1 : -1;               // +, -, +, - : cảnh quay về gần chỗ cũ
-            calDrag = CAL_DRAGS[calTry % CAL_DRAGS.length];
-            int ex = SWIPE_START_X + (horizontal ? calSign * calDrag : 0);
-            int ey = SWIPE_START_Y + (horizontal ? 0 : calSign * calDrag);
-            MinitouchController.swipePath(AimMath.easedPath(SWIPE_START_X, SWIPE_START_Y, ex, ey, CAL_STEPS), CAL_STEP_MS);
-            calReadyAt = now + CAL_SETTLE_MS;
-            calPhase = 1;
-            return true;
-        }
-
-        if (now < calReadyAt) return true;
-        calPhase = 0;
-        if (!nativeCalibStore(buffer, imgW, imgH, rowStride, 1)) return true;
-        long r = nativeCalibShift(calAxis);
-
-        double g = Double.NaN;
-        if (r != 0) {
-            double sceneShift = ((int) (r & 0xFFFFFFFFL) - 200000) / 10.0;
-            g = AimMath.gainFromShift(sceneShift, calSign * (double) calDrag);
-            Log.d("ProcTyCal", (horizontal ? "X" : "Y") + " lần " + (calTry + 1) + " drag=" + (calSign * calDrag)
-                    + ": cảnh dịch " + sceneShift + " px => g=" + g);
-        } else {
-            Log.w("ProcTyCal", (horizontal ? "X" : "Y") + " lần " + (calTry + 1) + " drag=" + (calSign * calDrag)
-                    + ": không đo được (xem log ProcTyNative)");
-        }
-        if (!Double.isNaN(g)) calG[calGn++] = g;
-        calTry++;
-
-        // Nhất quán: >=2 lần đo cùng dấu, max/min <= 1.6
-        boolean agree = false;
-        if (calGn >= CAL_NEED_OK) {
-            double mn = Double.MAX_VALUE, mx = 0;
-            boolean sameSign = true;
-            for (int k = 0; k < calGn; k++) {
-                mn = Math.min(mn, Math.abs(calG[k])); mx = Math.max(mx, Math.abs(calG[k]));
-                if (Math.signum(calG[k]) != Math.signum(calG[0])) sameSign = false;
-            }
-            agree = sameSign && mx <= mn * 1.6;
-        }
-
-        if (agree || calTry >= CAL_MAX_TRIES) {
-            String ax = horizontal ? "X" : "Y";
-            double med = (calGn > 0) ? AimMath.median(calG, calGn) : Double.NaN;
-            if (Double.isNaN(med)) {
-                med = FALLBACK_G;
-                Log.e("ProcTyCal", "Hiệu chuẩn trục " + ax + " THẤT BẠI -> dùng g dự phòng=" + med + " (không lưu)");
-            } else if (!agree) {
-                Log.w("ProcTyCal", "Trục " + ax + " đo không nhất quán (" + calGn + " mẫu) -> dùng trung vị g=" + med + " (không lưu)");
-            }
-            if (horizontal) { aimGx = med; calOkX = agree; aimGy = 0; calAxis = 1; }
-            else {
-                aimGy = med;
-                gTrusted = calOkX && agree;
-                Log.i("ProcTyCal", "Hiệu chuẩn xong: gx=" + aimGx + " gy=" + aimGy + (gTrusted ? " (tin cậy, đã lưu)" : " (một phần dự phòng)"));
-                if (gTrusted) prefs.edit().putFloat("aim_gx", (float) aimGx).putFloat("aim_gy", (float) aimGy).apply();
-            }
-            calGn = 0;
-            calTry = 0;
-        }
-        return true;
+        } catch (Exception e) { Log.e(TAG_ERROR, "Lỗi frame: " + e.getMessage()); }
     }
 
     private final MediaProjection.Callback projectionCallback = new MediaProjection.Callback() {
         @Override
-        public void onStop() {
-            isScanning = false;
-            releaseCapture();
-            stopSelf();
-        }
+        public void onStop() { isScanning = false; releaseCapture(); stopSelf(); }
     };
 
     private final VirtualDisplay.Callback virtualDisplayCallback = new VirtualDisplay.Callback() {
-        @Override
-        public void onPaused() { Log.w(TAG_FRAME, "VirtualDisplay: PAUSED"); }
-        @Override
-        public void onResumed() { Log.i(TAG_FRAME, "VirtualDisplay: RESUMED"); }
-        @Override
-        public void onStopped() { Log.w(TAG_FRAME, "VirtualDisplay: STOPPED"); }
+        @Override public void onPaused() {}
+        @Override public void onResumed() {}
+        @Override public void onStopped() {}
     };
 
     private final DisplayManager.DisplayListener displayListener = new DisplayManager.DisplayListener() {
-        @Override
-        public void onDisplayAdded(int displayId) {}
-        @Override
-        public void onDisplayRemoved(int displayId) {}
-        @Override
-        public void onDisplayChanged(int displayId) {
-            if (displayId == Display.DEFAULT_DISPLAY) resizeCaptureIfNeeded();
-        }
+        @Override public void onDisplayAdded(int displayId) {}
+        @Override public void onDisplayRemoved(int displayId) {}
+        @Override public void onDisplayChanged(int displayId) { if (displayId == Display.DEFAULT_DISPLAY) resizeCaptureIfNeeded(); }
     };
 
     private synchronized void resizeCaptureIfNeeded() {
         VirtualDisplay vd = virtualDisplay;
         if (vd == null) return;
-
         int[] size = queryDisplaySize();
         if (size[0] == captureWidth && size[1] == captureHeight && size[2] == captureDpi) return;
-
         try {
-            dropHeldImage();   // ảnh giữ lại thuộc reader cũ -> phải bỏ trước khi đổi kích thước
+            dropHeldImage();
             ImageReader old = imageReader;
             ImageReader fresh = createReader(size[0], size[1]);
-
             vd.resize(size[0], size[1], size[2]);
             vd.setSurface(fresh.getSurface());
-
-            imageReader = fresh;
-            captureWidth = size[0];
-            captureHeight = size[1];
-            captureDpi = size[2];
-
-            if (old != null) {
-                old.setOnImageAvailableListener(null, null);
-                old.close();
-            }
-            Log.i(TAG_FRAME, "Đổi hướng/kích thước -> " + captureWidth + "x" + captureHeight + " @" + captureDpi + "dpi");
-            maaRestartTried = false;
-            repositionOverlays();   // inset đổi khi xoay -> đo lại & vẽ lại overlay
-            MinitouchController.close();
-            MinitouchController.init(this);
-        } catch (Exception e) {
-            Log.e(TAG_ERROR, "Lỗi resize capture: " + e, e);
-        }
+            imageReader = fresh; captureWidth = size[0]; captureHeight = size[1]; captureDpi = size[2];
+            if (old != null) { old.setOnImageAvailableListener(null, null); old.close(); }
+            repositionOverlays(); MinitouchController.close(); MinitouchController.init(this);
+        } catch (Exception e) { Log.e(TAG_ERROR, "Lỗi resize capture: " + e, e); }
     }
 
     private void dropHeldImage() {
-        synchronized (imgLock) {
-            if (heldImage != null) { try { heldImage.close(); } catch (Exception ignored) {} heldImage = null; }
-        }
+        synchronized (imgLock) { if (heldImage != null) { try { heldImage.close(); } catch (Exception ignored) {} heldImage = null; } }
     }
 
     private synchronized void releaseCapture() {
         tickRunning = false;
         if (captureHandler != null) captureHandler.removeCallbacks(idleTick);
         dropHeldImage();
-        if (displayManager != null) {
-            try { displayManager.unregisterDisplayListener(displayListener); } catch (Exception ignored) {}
-        }
-        
-        if (roiView != null && windowManager != null) {
-            try { windowManager.removeView(roiView); } catch (Exception ignored) {}
-            roiView = null;
-        }
-
-        if (debugDotView != null && windowManager != null) {
-            try { windowManager.removeView(debugDotView); } catch (Exception ignored) {}
-            debugDotView = null;
-        }
-        if (debugCenterView != null && windowManager != null) {
-            try { windowManager.removeView(debugCenterView); } catch (Exception ignored) {}
-            debugCenterView = null;
-        }
-
-        ImageReader reader = imageReader;
-        VirtualDisplay vd = virtualDisplay;
-        imageReader = null;
-        virtualDisplay = null;
-
+        if (displayManager != null) { try { displayManager.unregisterDisplayListener(displayListener); } catch (Exception ignored) {} }
+        if (roiView != null && windowManager != null) { try { windowManager.removeView(roiView); } catch (Exception ignored) {} roiView = null; }
+        if (debugDotView != null && windowManager != null) { try { windowManager.removeView(debugDotView); } catch (Exception ignored) {} debugDotView = null; }
+        if (debugCenterView != null && windowManager != null) { try { windowManager.removeView(debugCenterView); } catch (Exception ignored) {} debugCenterView = null; }
+        ImageReader reader = imageReader; VirtualDisplay vd = virtualDisplay; imageReader = null; virtualDisplay = null;
         if (reader != null) reader.setOnImageAvailableListener(null, null);
-        if (vd != null) {
-            try { vd.release(); } catch (Exception ignored) {}
-        }
-        if (reader != null) {
-            try { reader.close(); } catch (Exception ignored) {}
-        }
+        if (vd != null) { try { vd.release(); } catch (Exception ignored) {} }
+        if (reader != null) { try { reader.close(); } catch (Exception ignored) {} }
+        if (socketClient != null) socketClient.close();
     }
 
     @Override
     public void onDestroy() {
         super.onDestroy();
         isScanning = false;
-
         if (captureHandler != null) captureHandler.removeCallbacksAndMessages(null);
         releaseCapture();
-
-        if (mediaProjection != null) {
-            try { mediaProjection.unregisterCallback(projectionCallback); } catch (Exception ignored) {}
-            try { mediaProjection.stop(); } catch (Exception ignored) {}
-            mediaProjection = null;
-        }
-
-        if (captureThread != null) {
-            captureThread.quitSafely();
-            captureThread = null;
-            captureHandler = null;
-        }
-        
+        if (mediaProjection != null) { try { mediaProjection.unregisterCallback(projectionCallback); } catch (Exception ignored) {} try { mediaProjection.stop(); } catch (Exception ignored) {} mediaProjection = null; }
+        if (captureThread != null) { captureThread.quitSafely(); captureThread = null; captureHandler = null; }
         MinitouchController.close();
     }
-    }
+}
