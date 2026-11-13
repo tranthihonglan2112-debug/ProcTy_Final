@@ -1,8 +1,6 @@
 package com.my.procty;
 
-import android.graphics.Bitmap;
 import android.util.Log;
-import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.net.Socket;
@@ -29,6 +27,7 @@ public class SocketClient {
     private void connect() {
         try {
             socket = new Socket(ip, port);
+            socket.setTcpNoDelay(true); // Tắt Nagle để giảm độ trễ
             out = new DataOutputStream(socket.getOutputStream());
             in = new DataInputStream(socket.getInputStream());
             connected = true;
@@ -39,7 +38,8 @@ public class SocketClient {
         }
     }
 
-    public void sendFrame(Bitmap bitmap, int roiX, int roiY, int roiW, int roiH, OnResultListener listener) {
+    // Sửa lại hàm sendFrame để nhận dữ liệu thô (Raw Data)
+    public void sendFrame(byte[] rawData, int width, int height, int rowStride, OnResultListener listener) {
         if (!connected) {
             connect();
             if (!connected) return;
@@ -47,14 +47,17 @@ public class SocketClient {
 
         new Thread(() -> {
             try {
-                ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                bitmap.compress(Bitmap.CompressFormat.JPEG, 80, baos);
-                byte[] data = baos.toByteArray();
-
-                out.writeInt(data.length);
-                out.write(data);
+                // Gửi thông số ảnh (width, height, rowStride)
+                out.writeInt(width);
+                out.writeInt(height);
+                out.writeInt(rowStride);
+                
+                // Gửi dữ liệu ảnh thô
+                out.writeInt(rawData.length);
+                out.write(rawData);
                 out.flush();
 
+                // Nhận kết quả từ Server
                 int targetX = in.readInt();
                 int targetY = in.readInt();
                 

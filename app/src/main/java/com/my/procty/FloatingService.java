@@ -7,7 +7,6 @@ import android.app.Service;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.ServiceInfo;
-import android.graphics.Bitmap;
 import android.graphics.PixelFormat;
 import android.graphics.drawable.GradientDrawable;
 import android.hardware.display.DisplayManager;
@@ -389,17 +388,22 @@ public class FloatingService extends Service {
 
             if (roiX < 0 || roiY < 0 || roiX + roiW > imgW || roiY + roiH > imgH) return;
 
-            // TẠO BITMAP CHUẨN XÁC TỪ BUFFER (CHỈ CẮT VÙNG ROI 300X300)
-            Bitmap bitmap = Bitmap.createBitmap(roiW, roiH, Bitmap.Config.ARGB_8888);
+            // --- SỬA ĐỔI: LẤY DỮ LIỆU THÔ (KHÔNG DÙNG BITMAP) ---
+            // Di chuyển con trỏ buffer đến đúng vị trí bắt đầu của ROI
             int startOffset = (roiY * rowStride) + (roiX * pixelStride);
             buffer.position(startOffset);
-            bitmap.copyPixelsFromBuffer(buffer);
+
+            // Tính kích thước mảng byte cần lấy cho vùng ROI
+            int dataSize = (roiH - 1) * rowStride + roiW * pixelStride;
+            byte[] rawData = new byte[dataSize];
+            buffer.get(rawData);
 
             // Gửi ảnh qua Socket
             long now = SystemClock.uptimeMillis();
             if (now - lastSwipeUptime >= MIN_SWIPE_INTERVAL_MS) {
                 lastSwipeUptime = now;
-                socketClient.sendFrame(bitmap, roiX, roiY, roiW, roiH, (targetX, targetY) -> {
+                // Gửi rawData thay vì bitmap
+                socketClient.sendFrame(rawData, roiW, roiH, rowStride, (targetX, targetY) -> {
                     if (targetX != -1 && targetY != -1) {
                         showDebugDot(targetX, targetY);
                         MinitouchController.swipePath(
