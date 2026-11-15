@@ -17,6 +17,10 @@
     
     <!-- Quyền mạng (bắt buộc để gửi ảnh qua Socket) -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Để chọn đúng mạng Wi-Fi khi kết nối tới máy tính -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- targetSdk 34: foreground service nào cũng phải khai báo type -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
 
     <application
         android:allowBackup="true"
@@ -45,7 +49,12 @@
         <!-- Service hiển thị menu nổi -->
         <service
             android:name=".FloatingMenuService"
-            android:exported="false" />
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="floating_overlay_menu" />
+        </service>
 
         <!-- Provider của Shizuku -->
         <provider

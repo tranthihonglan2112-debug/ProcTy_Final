@@ -97,6 +97,10 @@ public class MainActivity extends AppCompatActivity {
         });
 
         btnStartProcTy.setOnClickListener(v -> {
+            // Luôn lưu IP đang hiện trong ô nhập (kể cả khi quên bấm "Lưu IP")
+            String curIp = edtServerIp.getText().toString().trim();
+            if (!TextUtils.isEmpty(curIp)) prefs.edit().putString("server_ip", curIp).apply();
+
             if (!ShizukuChecker.hasShizukuPermission()) {
                 Toast.makeText(this, "Chưa kết nối hoặc cấp quyền Shizuku!", Toast.LENGTH_SHORT).show();
                 return;

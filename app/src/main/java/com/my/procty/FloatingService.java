@@ -28,6 +28,7 @@ import android.view.Gravity;
 import android.view.View;
 import android.view.ViewTreeObserver;
 import android.view.WindowManager;
+import android.widget.Toast;
 import androidx.core.app.NotificationCompat;
 import java.io.File;
 import java.io.FileWriter;
@@ -90,7 +91,7 @@ public class FloatingService extends Service {
     private Image heldImage = null;
     private long lastProcessUptime = 0;
     private volatile boolean tickRunning = false;
-    private SocketClient socketClient;
+    private volatile SocketClient socketClient;
 
     @Override
     public IBinder onBind(Intent intent) { return null; }
@@ -102,6 +103,9 @@ public class FloatingService extends Service {
         prefs = getSharedPreferences("proc_ty_settings", MODE_PRIVATE);
         windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
 
+        // Kết nối PC trước tiên: dù các bước khởi tạo bên dưới có lỗi thì PC vẫn thấy điện thoại kết nối
+        ensureSocket();
+
         try {
             displayManager = (DisplayManager) getSystemService(DISPLAY_SERVICE);
             captureThread = new HandlerThread("ProcTyCapture");
@@ -110,15 +114,37 @@ public class FloatingService extends Service {
             startForegroundWithAppropriateType();
             MinitouchController.init(this);
             
-            // Đọc IP đã lưu từ SharedPreferences
-            SharedPreferences appPrefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
-            serverIp = appPrefs.getString("server_ip", "192.168.1.5");
-            
-            // Khởi tạo kết nối Socket tới máy tính
-            socketClient = new SocketClient(serverIp, SERVER_PORT);
             
         } catch (Exception e) {
             Log.e(TAG_ERROR, "Lỗi onCreate: " + e, e);
+        }
+    }
+
+    /** Tạo (hoặc tạo lại nếu IP đã đổi) kết nối tới máy tính. Hỗ trợ nhập "ip" hoặc "ip:cổng". */
+    private void ensureSocket() {
+        try {
+            SharedPreferences appPrefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
+            String saved = appPrefs.getString("server_ip", "192.168.1.5");
+            saved = saved == null ? "" : saved.trim();
+            if (socketClient != null && saved.equals(serverIp)) return; // IP không đổi: client tự reconnect
+
+            if (socketClient != null) { socketClient.close(); socketClient = null; }
+            serverIp = saved;
+
+            String host = saved;
+            int port = SERVER_PORT;
+            int colon = saved.lastIndexOf(':');
+            if (colon > 0 && colon == saved.indexOf(':')) { // đúng 1 dấu ':' -> "ip:cổng"
+                try {
+                    port = Integer.parseInt(saved.substring(colon + 1).trim());
+                    host = saved.substring(0, colon).trim();
+                } catch (NumberFormatException ignored) {}
+            }
+
+            socketClient = new SocketClient(getApplicationContext(), host, port, (ok, msg) ->
+                    uiHandler.post(() -> Toast.makeText(getApplicationContext(), msg, Toast.LENGTH_SHORT).show()));
+        } catch (Exception e) {
+            Log.e(TAG_ERROR, "Lỗi tạo socket: " + e, e);
         }
     }
 
@@ -152,6 +178,7 @@ public class FloatingService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        ensureSocket(); // IP đổi -> tạo lại kết nối
         try {
             if (intent != null && mediaProjection == null) {
                 int resultCode = intent.getIntExtra("code", 0);
@@ -380,7 +407,8 @@ public class FloatingService extends Service {
             int rowStride = planes[0].getRowStride();
             int pixelStride = planes[0].getPixelStride();
 
-            final int roiInset = 5;
+            
+            final int roiInset = 5; 
             final int roiX = roiRealX + roiInset;
             final int roiY = roiRealY + roiInset;
             final int roiW = roiBoxSize - 2 * roiInset;
@@ -401,17 +429,22 @@ public class FloatingService extends Service {
             // Gửi ảnh qua Socket
             long now = SystemClock.uptimeMillis();
             if (now - lastSwipeUptime >= MIN_SWIPE_INTERVAL_MS) {
-                lastSwipeUptime = now;
-                // Gửi rawData thay vì bitmap
-                socketClient.sendFrame(rawData, roiW, roiH, rowStride, (targetX, targetY) -> {
+                SocketClient sc = socketClient;
+                // Gửi rawData thay vì bitmap; chưa kết nối / gói trước chưa xong -> bỏ khung, không treo
+                boolean sent = sc != null && sc.sendFrame(rawData, roiW, roiH, rowStride, (targetX, targetY) -> {
                     if (targetX != -1 && targetY != -1) {
-                        showDebugDot(targetX, targetY);
+                        // --- SỬA LỖI 1: Cộng tọa độ ROI vào tọa độ mục tiêu ---
+                        final int realX = targetX + roiRealX;
+                        final int realY = targetY + roiRealY;
+
+                        showDebugDot(realX, realY);
                         MinitouchController.swipePath(
-                                AimMath.easedPath(SWIPE_START_X, SWIPE_START_Y, targetX, targetY, SWIPE_STEPS),
+                                AimMath.easedPath(SWIPE_START_X, SWIPE_START_Y, realX, realY, SWIPE_STEPS),
                                 SWIPE_STEP_MS
                         );
                     }
                 });
+                if (sent) lastSwipeUptime = now;
             }
         } catch (Exception e) { Log.e(TAG_ERROR, "Lỗi frame: " + e.getMessage()); }
     }
@@ -466,7 +499,7 @@ public class FloatingService extends Service {
         if (reader != null) reader.setOnImageAvailableListener(null, null);
         if (vd != null) { try { vd.release(); } catch (Exception ignored) {} }
         if (reader != null) { try { reader.close(); } catch (Exception ignored) {} }
-        if (socketClient != null) socketClient.close();
+        if (socketClient != null) { socketClient.close(); socketClient = null; }
     }
 
     @Override
