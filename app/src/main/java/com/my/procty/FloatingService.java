@@ -46,8 +46,9 @@ public class FloatingService extends Service {
     // --- CẤU HÌNH VUỐT ---
     private static final int SWIPE_START_X = 1299;
     private static final int SWIPE_START_Y = 360;
-    private static final int SWIPE_STEPS = 8;
-    private static final int SWIPE_STEP_MS = 16;
+    // Tăng số bước và thời gian để vuốt mượt hơn, không bị game nuốt cú vuốt
+    private static final int SWIPE_STEPS = 12; 
+    private static final int SWIPE_STEP_MS = 25;
     private static final long MIN_SWIPE_INTERVAL_MS = (SWIPE_STEPS + 1) * SWIPE_STEP_MS + 60;
 
     private static final boolean DEBUG_DOTS_DEFAULT = false;
@@ -61,6 +62,9 @@ public class FloatingService extends Service {
     private View roiView;
     private View debugDotView;
     private View debugCenterView;
+    
+    // BIẾN MỚI: Dùng để vẽ khung YOLO
+    private View yoloBoxView;
 
     private DisplayManager displayManager;
     private MediaProjection mediaProjection;
@@ -103,7 +107,7 @@ public class FloatingService extends Service {
         prefs = getSharedPreferences("proc_ty_settings", MODE_PRIVATE);
         windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
 
-        // Kết nối PC trước tiên: dù các bước khởi tạo bên dưới có lỗi thì PC vẫn thấy điện thoại kết nối
+        // Kết nối PC trước tiên
         ensureSocket();
 
         try {
@@ -120,13 +124,12 @@ public class FloatingService extends Service {
         }
     }
 
-    /** Tạo (hoặc tạo lại nếu IP đã đổi) kết nối tới máy tính. Hỗ trợ nhập "ip" hoặc "ip:cổng". */
     private void ensureSocket() {
         try {
             SharedPreferences appPrefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
             String saved = appPrefs.getString("server_ip", "192.168.1.5");
             saved = saved == null ? "" : saved.trim();
-            if (socketClient != null && saved.equals(serverIp)) return; // IP không đổi: client tự reconnect
+            if (socketClient != null && saved.equals(serverIp)) return;
 
             if (socketClient != null) { socketClient.close(); socketClient = null; }
             serverIp = saved;
@@ -134,7 +137,7 @@ public class FloatingService extends Service {
             String host = saved;
             int port = SERVER_PORT;
             int colon = saved.lastIndexOf(':');
-            if (colon > 0 && colon == saved.indexOf(':')) { // đúng 1 dấu ':' -> "ip:cổng"
+            if (colon > 0 && colon == saved.indexOf(':')) {
                 try {
                     port = Integer.parseInt(saved.substring(colon + 1).trim());
                     host = saved.substring(0, colon).trim();
@@ -178,7 +181,7 @@ public class FloatingService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        ensureSocket(); // IP đổi -> tạo lại kết nối
+        ensureSocket();
         try {
             if (intent != null && mediaProjection == null) {
                 int resultCode = intent.getIntExtra("code", 0);
@@ -431,17 +434,61 @@ public class FloatingService extends Service {
             if (now - lastSwipeUptime >= MIN_SWIPE_INTERVAL_MS) {
                 SocketClient sc = socketClient;
                 // Gửi rawData thay vì bitmap; chưa kết nối / gói trước chưa xong -> bỏ khung, không treo
-                boolean sent = sc != null && sc.sendFrame(rawData, roiW, roiH, rowStride, (targetX, targetY) -> {
+                boolean sent = sc != null && sc.sendFrame(rawData, roiW, roiH, rowStride, (targetX, targetY, boxW, boxH) -> {
                     if (targetX != -1 && targetY != -1) {
-                        // --- SỬA LỖI 1: Cộng tọa độ ROI vào tọa độ mục tiêu ---
+                        // Tọa độ thực của mục tiêu trên màn hình
                         final int realX = targetX + roiRealX;
                         final int realY = targetY + roiRealY;
 
+                        // Tính độ dời (Delta) từ tâm quét đến mục tiêu
+                        final int deltaX = realX - FF_CROSSHAIR_X;
+                        final int deltaY = realY - FF_CROSSHAIR_Y;
+
+                        // Dùng relativeEnd để tính điểm cuối ngón tay (giả định gain = 1.0)
+                        int[] endPt = AimMath.relativeEnd(
+                                SWIPE_START_X, SWIPE_START_Y,
+                                deltaX, deltaY,
+                                1.0, 1.0,           // gainX, gainY (Tinh chỉnh 0.7 nếu chưa tới, 1.3 nếu lố)
+                                1.0,                // damp
+                                500.0,              // maxLen
+                                2400, 1080          // screenW, screenH
+                        );
+
                         showDebugDot(realX, realY);
+
+                        // --- VẼ KHUNG YOLO TRÊN ĐIỆN THOẠI ---
+                        uiHandler.post(() -> {
+                            if (yoloBoxView == null) {
+                                yoloBoxView = new View(this);
+                                GradientDrawable border = new GradientDrawable();
+                                border.setColor(0x00000000); // Trong suốt
+                                border.setStroke(4, 0xFFFF0000); // Viền đỏ 4px
+                                yoloBoxView.setBackground(border);
+                                WindowManager.LayoutParams p = newOverlayParams(boxW, boxH);
+                                windowManager.addView(yoloBoxView, p);
+                            }
+                            try {
+                                WindowManager.LayoutParams p = (WindowManager.LayoutParams) yoloBoxView.getLayoutParams();
+                                p.width = boxW;
+                                p.height = boxH;
+                                p.x = realX - (boxW / 2) - ovOffX;
+                                p.y = realY - (boxH / 2) - ovOffY;
+                                windowManager.updateViewLayout(yoloBoxView, p);
+                            } catch (Exception ignored) {}
+                        });
+
                         MinitouchController.swipePath(
-                                AimMath.easedPath(SWIPE_START_X, SWIPE_START_Y, realX, realY, SWIPE_STEPS),
+                                AimMath.easedPath(SWIPE_START_X, SWIPE_START_Y, endPt[0], endPt[1], SWIPE_STEPS),
                                 SWIPE_STEP_MS
                         );
+                    } else {
+                        // Nếu không tìm thấy, ẩn khung đi
+                        uiHandler.post(() -> {
+                            if (yoloBoxView != null) {
+                                try { windowManager.removeView(yoloBoxView); } catch (Exception ignored) {}
+                                yoloBoxView = null;
+                            }
+                        });
                     }
                 });
                 if (sent) lastSwipeUptime = now;
@@ -495,6 +542,10 @@ public class FloatingService extends Service {
         if (roiView != null && windowManager != null) { try { windowManager.removeView(roiView); } catch (Exception ignored) {} roiView = null; }
         if (debugDotView != null && windowManager != null) { try { windowManager.removeView(debugDotView); } catch (Exception ignored) {} debugDotView = null; }
         if (debugCenterView != null && windowManager != null) { try { windowManager.removeView(debugCenterView); } catch (Exception ignored) {} debugCenterView = null; }
+        
+        // Xóa khung YOLO khi tắt
+        if (yoloBoxView != null && windowManager != null) { try { windowManager.removeView(yoloBoxView); } catch (Exception ignored) {} yoloBoxView = null; }
+        
         ImageReader reader = imageReader; VirtualDisplay vd = virtualDisplay; imageReader = null; virtualDisplay = null;
         if (reader != null) reader.setOnImageAvailableListener(null, null);
         if (vd != null) { try { vd.release(); } catch (Exception ignored) {} }

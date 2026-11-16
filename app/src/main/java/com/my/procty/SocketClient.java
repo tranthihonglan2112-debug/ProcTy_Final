@@ -19,19 +19,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-/**
- * Client TCP gửi khung hình tới server_orb.py.
- *
- * Giao thức (LITTLE-ENDIAN, khớp struct.unpack("<iiii") bên Python):
- *   Phone -> PC : int32 width, int32 height, int32 rowStride, int32 dataLen, dataLen byte
- *   PC -> Phone : int32 x, int32 y
- *
- * Khác bản cũ:
- *  - Bản cũ dùng DataOutputStream.writeInt (BIG-endian) nên server đọc ra data_len rác và ngắt kết nối.
- *  - Tự kết nối lại liên tục (timeout 3s) thay vì thử đúng 1 lần rồi bỏ.
- *  - Mỗi lúc chỉ có 1 gói đang bay -> không bao giờ ghi chồng lên nhau làm lệch luồng.
- *  - Ưu tiên đi qua mạng Wi-Fi (tránh Android đẩy sang 4G khi Wi-Fi "không có Internet").
- */
 public class SocketClient {
     private static final String TAG = "ProcTy_Socket";
     private static final int CONNECT_TIMEOUT_MS = 3000;
@@ -39,10 +26,10 @@ public class SocketClient {
     private static final long RETRY_DELAY_MS = 2000;
 
     public interface OnResultListener {
-        void onResult(int targetX, int targetY);
+        // Sửa ở đây: Thêm tham số w, h
+        void onResult(int targetX, int targetY, int w, int h);
     }
 
-    /** Báo trạng thái kết nối (gọi từ luồng nền; chỉ gọi khi trạng thái đổi). */
     public interface OnStatusListener {
         void onStatus(boolean connected, String message);
     }
@@ -67,7 +54,7 @@ public class SocketClient {
 
     private volatile boolean connected = false;
     private volatile boolean closed = false;
-    private volatile int lastReported = -1; // -1: chưa báo, 0: mất kết nối, 1: đã kết nối
+    private volatile int lastReported = -1;
 
     public SocketClient(Context context, String ip, int port, OnStatusListener statusListener) {
         this.appContext = context.getApplicationContext();
@@ -83,7 +70,6 @@ public class SocketClient {
         return connected && !closed;
     }
 
-    // ----------------------------------------------------------------- kết nối
     private void connectLoop() {
         while (!closed) {
             if (!connected) {
@@ -92,7 +78,7 @@ public class SocketClient {
                     continue;
                 }
             }
-            sleepQuiet(1000); // đang nối: chỉ kiểm tra lại mỗi giây (sendFrame sẽ tự đánh dấu mất kết nối)
+            sleepQuiet(1000);
         }
     }
 
@@ -103,7 +89,6 @@ public class SocketClient {
         }
         Network wifi = findWifiNetwork();
         Exception last = null;
-        // Lần 1: ép đi qua Wi-Fi (nếu có). Lần 2: mạng mặc định (USB tethering, ethernet...).
         for (int attempt = 0; attempt < 2; attempt++) {
             if (attempt == 1 && wifi == null) break;
             Network bind = (attempt == 0) ? wifi : null;
@@ -155,11 +140,6 @@ public class SocketClient {
         return null;
     }
 
-    // ------------------------------------------------------------------- gửi
-    /**
-     * Gửi 1 khung. Trả về true nếu khung được nhận gửi đi; false nếu chưa kết nối
-     * hoặc gói trước chưa xong (khung bị bỏ để không chồng gói). Không chặn luồng gọi.
-     */
     public boolean sendFrame(final byte[] rawData, final int width, final int height,
                              final int rowStride, final OnResultListener listener) {
         if (closed || !connected) return false;
@@ -180,7 +160,7 @@ public class SocketClient {
 
         try {
             sender.execute(() -> {
-                int tx = -1, ty = -1;
+                int tx = -1, ty = -1, tw = 0, th = 0;
                 try {
                     ByteBuffer header = ByteBuffer.allocate(16).order(ByteOrder.LITTLE_ENDIAN);
                     header.putInt(width).putInt(height).putInt(rowStride).putInt(rawData.length);
@@ -188,11 +168,14 @@ public class SocketClient {
                     o.write(rawData);
                     o.flush();
 
-                    byte[] reply = new byte[8];
+                    // Đọc 16 byte thay vì 8 byte
+                    byte[] reply = new byte[16];
                     i.readFully(reply);
                     ByteBuffer rb = ByteBuffer.wrap(reply).order(ByteOrder.LITTLE_ENDIAN);
                     tx = rb.getInt();
                     ty = rb.getInt();
+                    tw = rb.getInt();
+                    th = rb.getInt();
                 } catch (Exception e) {
                     Log.e(TAG, "Lỗi gửi/nhận: " + e);
                     markDisconnected(s);
@@ -200,7 +183,8 @@ public class SocketClient {
                     return;
                 }
                 try {
-                    if (listener != null) listener.onResult(tx, ty);
+                    // Gọi listener với 4 tham số
+                    if (listener != null) listener.onResult(tx, ty, tw, th);
                 } catch (Throwable t) {
                     Log.e(TAG, "Lỗi xử lý kết quả: " + t);
                 } finally {
@@ -240,11 +224,10 @@ public class SocketClient {
         }
     }
 
-    // ------------------------------------------------------------- tiện ích
     private void report(boolean ok, String msg) {
         if (ok) Log.i(TAG, msg); else Log.w(TAG, msg);
         int state = ok ? 1 : 0;
-        if (state == lastReported) return; // chỉ báo khi trạng thái đổi, tránh spam Toast
+        if (state == lastReported) return;
         lastReported = state;
         OnStatusListener l = statusListener;
         if (l != null) {
