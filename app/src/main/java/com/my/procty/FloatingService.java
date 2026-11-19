@@ -40,15 +40,18 @@ public class FloatingService extends Service {
     private static final boolean REQUIRE_LANDSCAPE = true;
 
     // --- CẤU HÌNH MẠNG ---
+    // Port mặc định khi người dùng chỉ nhập IP/domain mà không kèm ":port".
+    // Với tunnel (playit.gg...) hãy nhập đủ "domain:port" trong app.
     private static final int SERVER_PORT = 12345;
-    private String serverIp = "192.168.1.5"; // Giá trị mặc định
+    private static final boolean COMPACT_FRAME = true;
+    private String serverIp = "";
 
     // --- CẤU HÌNH VUỐT ---
     private static final int SWIPE_START_X = 1299;
     private static final int SWIPE_START_Y = 360;
     // Tăng số bước và thời gian để vuốt mượt hơn, không bị game nuốt cú vuốt
-    private static final int SWIPE_STEPS = 12; 
-    private static final int SWIPE_STEP_MS = 25;
+    private static final int SWIPE_STEPS = 9; 
+    private static final int SWIPE_STEP_MS = 20;
     private static final long MIN_SWIPE_INTERVAL_MS = (SWIPE_STEPS + 1) * SWIPE_STEP_MS + 60;
 
     private static final boolean DEBUG_DOTS_DEFAULT = false;
@@ -127,24 +130,15 @@ public class FloatingService extends Service {
     private void ensureSocket() {
         try {
             SharedPreferences appPrefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
-            String saved = appPrefs.getString("server_ip", "192.168.1.5");
+            String saved = appPrefs.getString("server_ip", "dedication-schedule.tun.ply.gg");
             saved = saved == null ? "" : saved.trim();
             if (socketClient != null && saved.equals(serverIp)) return;
 
             if (socketClient != null) { socketClient.close(); socketClient = null; }
             serverIp = saved;
 
-            String host = saved;
-            int port = SERVER_PORT;
-            int colon = saved.lastIndexOf(':');
-            if (colon > 0 && colon == saved.indexOf(':')) {
-                try {
-                    port = Integer.parseInt(saved.substring(colon + 1).trim());
-                    host = saved.substring(0, colon).trim();
-                } catch (NumberFormatException ignored) {}
-            }
-
-            socketClient = new SocketClient(getApplicationContext(), host, port, (ok, msg) ->
+            // SocketClient tự tách host[:port] (hỗ trợ IP, domain, domain:port, tcp://...)
+            socketClient = new SocketClient(getApplicationContext(), saved, SERVER_PORT, (ok, msg) ->
                     uiHandler.post(() -> Toast.makeText(getApplicationContext(), msg, Toast.LENGTH_SHORT).show()));
         } catch (Exception e) {
             Log.e(TAG_ERROR, "Lỗi tạo socket: " + e, e);
@@ -424,17 +418,32 @@ public class FloatingService extends Service {
             int startOffset = (roiY * rowStride) + (roiX * pixelStride);
             buffer.position(startOffset);
 
-            // Tính kích thước mảng byte cần lấy cho vùng ROI
-            int dataSize = (roiH - 1) * rowStride + roiW * pixelStride;
-            byte[] rawData = new byte[dataSize];
-            buffer.get(rawData);
+            // Chỉ lấy đúng vùng ROI, bỏ phần đệm của cả hàng màn hình.
+            // (Trước đây mỗi hàng ROI gửi nguyên rowStride ~9.6KB -> ~2.8MB/khung; giờ ~340KB/khung.)
+            // Nếu server cũ không đọc rowStride trong header thì đặt COMPACT_FRAME = false.
+            final byte[] rawData;
+            final int sendStride;
+            if (COMPACT_FRAME) {
+                final int rowBytes = roiW * pixelStride;
+                rawData = new byte[rowBytes * roiH];
+                for (int row = 0; row < roiH; row++) {
+                    buffer.position(startOffset + row * rowStride);
+                    buffer.get(rawData, row * rowBytes, rowBytes);
+                }
+                sendStride = rowBytes;
+            } else {
+                int dataSize = (roiH - 1) * rowStride + roiW * pixelStride;
+                rawData = new byte[dataSize];
+                buffer.get(rawData);
+                sendStride = rowStride;
+            }
 
             // Gửi ảnh qua Socket
             long now = SystemClock.uptimeMillis();
             if (now - lastSwipeUptime >= MIN_SWIPE_INTERVAL_MS) {
                 SocketClient sc = socketClient;
                 // Gửi rawData thay vì bitmap; chưa kết nối / gói trước chưa xong -> bỏ khung, không treo
-                boolean sent = sc != null && sc.sendFrame(rawData, roiW, roiH, rowStride, (targetX, targetY, boxW, boxH) -> {
+                boolean sent = sc != null && sc.sendFrame(rawData, roiW, roiH, sendStride, (targetX, targetY, boxW, boxH) -> {
                     if (targetX != -1 && targetY != -1) {
                         // Tọa độ thực của mục tiêu trên màn hình
                         final int realX = targetX + roiRealX;

@@ -68,7 +68,7 @@ public class MainActivity extends AppCompatActivity {
         boolean isFirstRun = prefs.getBoolean("isFirstRun", true);
         
         // Load IP đã lưu (nếu có)
-        String savedIp = prefs.getString("server_ip", "192.168.1.5");
+        String savedIp = prefs.getString("server_ip", "dedication-schedule.tun.ply.gg");
         edtServerIp.setText(savedIp);
 
         if (isFirstRun) {
@@ -87,13 +87,13 @@ public class MainActivity extends AppCompatActivity {
         btnSaveIp.setOnClickListener(v -> {
             String ip = edtServerIp.getText().toString().trim();
             if (TextUtils.isEmpty(ip)) {
-                Toast.makeText(this, "Vui lòng nhập IP!", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "Vui lòng nhập IP/domain!", Toast.LENGTH_SHORT).show();
                 return;
             }
             SharedPreferences.Editor editor = prefs.edit();
             editor.putString("server_ip", ip);
             editor.apply();
-            Toast.makeText(this, "Đã lưu IP: " + ip, Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Đã lưu: " + ip, Toast.LENGTH_SHORT).show();
         });
 
         btnStartProcTy.setOnClickListener(v -> {

@@ -80,12 +80,12 @@
                     android:layout_height="50dp"
                     android:layout_weight="1"
                     android:background="#CC1A1A2E"
-                    android:hint="Nhập IP Máy Tính (VD: 192.168.1.5)"
+                    android:hint="IP hoặc domain:port (VD: dedication-schedule.tun.ply.gg:12345)"
                     android:textColorHint="#888888"
                     android:textColor="#00D2FF"
                     android:padding="12dp"
                     android:textSize="14sp"
-                    android:inputType="text"
+                    android:inputType="textUri"
                     android:singleLine="true" />
 
                 <Button
@@ -94,7 +94,7 @@
                     android:layout_height="50dp"
                     android:layout_marginLeft="8dp"
                     android:background="@drawable/bg_button_secondary"
-                    android:text="LƯU IP"
+                    android:text="LƯU"
                     android:textColor="#00D2FF"
                     android:textSize="12sp"
                     android:textStyle="bold"
