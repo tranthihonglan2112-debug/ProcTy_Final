@@ -84,7 +84,7 @@ public class FloatingService extends Service {
     private volatile boolean isScanning = false;
     private long lastSwipeUptime = 0;
     private SharedPreferences prefs;
-    private final int roiBoxSize = 300;
+    private final int roiBoxSize = 400;
 
     private volatile int roiRealX = 0;
     private volatile int roiRealY = 0;

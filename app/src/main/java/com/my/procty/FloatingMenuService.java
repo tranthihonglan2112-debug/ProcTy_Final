@@ -14,19 +14,14 @@ import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
-import android.widget.Button;
-import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 import androidx.core.app.NotificationCompat;
-import java.io.File;
 
 public class FloatingMenuService extends Service {
     private WindowManager windowManager;
     private View menuView;
-    private TextView btnToggle, btnExpand;
-    private LinearLayout menuOptions;
-    private boolean isExpanded = false;
+    private TextView btnToggle;
     private boolean isScanning = false;
 
     @Override
@@ -36,7 +31,7 @@ public class FloatingMenuService extends Service {
     public void onCreate() {
         super.onCreate();
         
-        // BẮT BUỘC: Phải gọi startForeground để không bị Android kill
+        // Khởi tạo Foreground Service để không bị kill
         String channelId = "menu_service_channel";
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = new NotificationChannel(channelId, "ProcTy Menu", NotificationManager.IMPORTANCE_LOW);
@@ -45,10 +40,10 @@ public class FloatingMenuService extends Service {
         }
         Notification notification = new NotificationCompat.Builder(this, channelId)
                 .setContentTitle("ProcTy Menu Active")
-                .setContentText("Menu đang chạy...")
+                .setContentText("Nút điều khiển đang chạy...")
                 .setSmallIcon(android.R.drawable.ic_menu_compass)
                 .build();
-        startForeground(2, notification); // ID = 2
+        startForeground(2, notification);
 
         windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
         initMenu();
@@ -56,7 +51,7 @@ public class FloatingMenuService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        // TỰ ĐỘNG KHỞI CHẠY FLOATINGSERVICE KHI NHẬN ĐƯỢC QUYỀN TỪ MAINACTIVITY
+        // Khởi chạy FloatingService (Aimbot) khi nhận quyền
         if (intent != null && intent.hasExtra("code") && intent.hasExtra("data")) {
             int resultCode = intent.getIntExtra("code", 0);
             Intent data = intent.getParcelableExtra("data");
@@ -77,68 +72,24 @@ public class FloatingMenuService extends Service {
 
     private void initMenu() {
         LayoutInflater inflater = LayoutInflater.from(this);
+        // Dùng layout mới chỉ có 1 nút
         menuView = inflater.inflate(R.layout.floating_menu, null);
 
         btnToggle = menuView.findViewById(R.id.btnToggle);
-        btnExpand = menuView.findViewById(R.id.btnExpand);
-        menuOptions = menuView.findViewById(R.id.menuOptions);
 
-        Button btnModeColor = menuView.findViewById(R.id.btnModeColor);
-        Button btnModeTemplate = menuView.findViewById(R.id.btnModeTemplate);
-        Button btnModeCapture = menuView.findViewById(R.id.btnModeCapture);
+        // Đọc trạng thái cũ
+        SharedPreferences prefs = getSharedPreferences("proc_ty_settings", MODE_PRIVATE);
+        isScanning = prefs.getBoolean("is_scanning", false);
+        updateButtonUI();
 
-        btnExpand.setOnClickListener(v -> {
-            if (isExpanded) {
-                menuOptions.setVisibility(View.GONE);
-                btnExpand.setText("≡");
-            } else {
-                menuOptions.setVisibility(View.VISIBLE);
-                btnExpand.setText("X");
-            }
-            isExpanded = !isExpanded;
-        });
-
+        // Sự kiện Bấm nút
         btnToggle.setOnClickListener(v -> {
             isScanning = !isScanning;
-            SharedPreferences prefs = getSharedPreferences("proc_ty_settings", MODE_PRIVATE);
             SharedPreferences.Editor editor = prefs.edit();
-
-            if (isScanning) {
-                btnToggle.setText("ON");
-                btnToggle.setTextColor(0xFF00D2FF);
-                btnToggle.setBackgroundResource(R.drawable.bg_floating_button);
-                editor.putBoolean("is_scanning", true);
-                Toast.makeText(this, "Đã bật quét!", Toast.LENGTH_SHORT).show();
-            } else {
-                btnToggle.setText("OFF");
-                btnToggle.setTextColor(0xFFFFFFFF);
-                btnToggle.setBackgroundResource(R.drawable.bg_floating_button_off);
-                editor.putBoolean("is_scanning", false);
-            }
+            editor.putBoolean("is_scanning", isScanning);
             editor.apply();
-        });
-
-        btnModeColor.setOnClickListener(v -> {
-            getSharedPreferences("proc_ty_settings", MODE_PRIVATE).edit()
-                    .putInt("mode", 1)
-                    .putInt("color_r", 200).putInt("color_g", 50).putInt("color_b", 50).apply();
-            Toast.makeText(this, "Đã chọn: Lọc Màu Đỏ", Toast.LENGTH_SHORT).show();
-            selectModeDone();
-        });
-
-        btnModeTemplate.setOnClickListener(v -> {
-            File file = new File("/storage/emulated/0/Download/head_front.png");
-            if (!file.exists()) {
-                Toast.makeText(this, "Chưa có ảnh mẫu trong thư mục Downloads!", Toast.LENGTH_LONG).show();
-                return;
-            }
-            getSharedPreferences("proc_ty_settings", MODE_PRIVATE).edit().putInt("mode", 2).apply();
-            Toast.makeText(this, "Đã chọn: So khớp Ảnh Mẫu", Toast.LENGTH_SHORT).show();
-            selectModeDone();
-        });
-
-        btnModeCapture.setOnClickListener(v -> {
-            Toast.makeText(this, "Tính năng chụp ảnh đang phát triển...", Toast.LENGTH_SHORT).show();
+            
+            updateButtonUI();
         });
 
         int layoutType = (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) ?
@@ -151,6 +102,7 @@ public class FloatingMenuService extends Service {
         params.x = 100;
         params.y = 300;
 
+        // Sự kiện Kéo thả nút (Drag)
         menuView.setOnTouchListener(new View.OnTouchListener() {
             private int initialX, initialY;
             private float initialTouchX, initialTouchY;
@@ -174,10 +126,17 @@ public class FloatingMenuService extends Service {
         windowManager.addView(menuView, params);
     }
 
-    private void selectModeDone() {
-        menuOptions.setVisibility(View.GONE);
-        btnExpand.setText("≡");
-        isExpanded = false;
+    // Cập nhật giao diện nút mỗi khi Bật/Tắt
+    private void updateButtonUI() {
+        if (isScanning) {
+            btnToggle.setText("ON");
+            btnToggle.setTextColor(0xFF00D2FF); // Xanh Neon
+            btnToggle.setBackgroundResource(R.drawable.bg_neon_on);
+        } else {
+            btnToggle.setText("OFF");
+            btnToggle.setTextColor(0xFFAAAAAA); // Xám mờ
+            btnToggle.setBackgroundResource(R.drawable.bg_neon_off);
+        }
     }
 
     @Override
