@@ -50,8 +50,8 @@ public class FloatingService extends Service {
     private static final int SWIPE_START_X = 1299;
     private static final int SWIPE_START_Y = 360;
     // Tăng số bước và thời gian để vuốt mượt hơn, không bị game nuốt cú vuốt
-    private static final int SWIPE_STEPS = 1; 
-    private static final int SWIPE_STEP_MS = 120;
+    private static final int SWIPE_STEPS = 3; 
+    private static final int SWIPE_STEP_MS = 20;
     private static final long MIN_SWIPE_INTERVAL_MS = (SWIPE_STEPS + 1) * SWIPE_STEP_MS + 60;
 
     private static final boolean DEBUG_DOTS_DEFAULT = false;
