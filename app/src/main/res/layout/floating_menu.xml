@@ -3,9 +3,10 @@
     android:layout_width="wrap_content"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:gravity="center">
+    android:gravity="center"
+    android:padding="10dp">
 
-    <!-- Nút ON/OFF duy nhất -->
+    <!-- Nút ON/OFF chính -->
     <TextView
         android:id="@+id/btnToggle"
         android:layout_width="60dp"
@@ -21,4 +22,70 @@
         android:shadowDy="2"
         android:shadowRadius="4" />
 
+    <!-- Nút mở rộng Menu -->
+    <TextView
+        android:id="@+id/btnExpand"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_marginTop="10dp"
+        android:gravity="center"
+        android:text="X"
+        android:textColor="#FFFFFF"
+        android:background="#55000000"
+        android:textStyle="bold"
+        android:visibility="visible" />
+
+    <!-- Menu ẩn chứa thanh trượt và nút Gần/Xa -->
+    <LinearLayout
+        android:id="@+id/menuOptions"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="#AA000000"
+        android:padding="10dp"
+        android:layout_marginTop="10dp"
+        android:visibility="gone">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Lực bù trừ (px)"
+            android:textColor="#00D2FF"
+            android:textSize="12sp" />
+
+        <SeekBar
+            android:id="@+id/seekBarPx"
+            android:layout_width="150dp"
+            android:layout_height="wrap_content"
+            android:max="100"
+            android:progress="40" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="10dp">
+
+            <Button
+                android:id="@+id/btnNear"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="40dp"
+                android:text="GẦN"
+                android:textSize="12sp"
+                android:backgroundTint="#00FF00"
+                android:textColor="#000000" />
+
+            <Button
+                android:id="@+id/btnFar"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="40dp"
+                android:layout_marginStart="5dp"
+                android:text="XA"
+                android:textSize="12sp"
+                android:backgroundTint="#FF0000"
+                android:textColor="#FFFFFF" />
+        </LinearLayout>
+    </LinearLayout>
 </LinearLayout>

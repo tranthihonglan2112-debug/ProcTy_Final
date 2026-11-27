@@ -10,7 +10,6 @@
         android:layout_height="match_parent"
         android:background="#4D000000" />
 
-    <!-- BỌC TẤT CẢ VÀO SCROLLVIEW ĐỂ CÓ THỂ CUỘN -->
     <ScrollView
         android:layout_width="match_parent"
         android:layout_height="match_parent"
@@ -25,11 +24,11 @@
             android:padding="28dp"
             android:visibility="gone">
 
-            <!-- CardView Giữ Nguyên -->
+            <!-- CardView Tiêu đề -->
             <androidx.cardview.widget.CardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="30dp"
+                android:layout_marginBottom="40dp"
                 app:cardBackgroundColor="#CC0A0A14"
                 app:cardCornerRadius="20dp"
                 app:cardElevation="15dp"
@@ -59,69 +58,36 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="6dp"
-                        android:text="CYBER COMMAND CENTER"
+                        android:text="ASSIST COMMAND CENTER"
                         android:textColor="#9D4EDD"
                         android:textSize="12sp"
                         android:letterSpacing="0.15" />
                 </LinearLayout>
             </androidx.cardview.widget.CardView>
 
-            <!-- Ô NHẬP IP SERVER -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_marginBottom="20dp"
-                android:gravity="center_vertical">
-
-                <EditText
-                    android:id="@+id/edtServerIp"
-                    android:layout_width="0dp"
-                    android:layout_height="50dp"
-                    android:layout_weight="1"
-                    android:background="#CC1A1A2E"
-                    android:hint="IP hoặc domain:port (VD: dedication-schedule.tun.ply.gg:12345)"
-                    android:textColorHint="#888888"
-                    android:textColor="#00D2FF"
-                    android:padding="12dp"
-                    android:textSize="14sp"
-                    android:inputType="textUri"
-                    android:singleLine="true" />
-
-                <Button
-                    android:id="@+id/btnSaveIp"
-                    android:layout_width="wrap_content"
-                    android:layout_height="50dp"
-                    android:layout_marginLeft="8dp"
-                    android:background="@drawable/bg_button_secondary"
-                    android:text="LƯU"
-                    android:textColor="#00D2FF"
-                    android:textSize="12sp"
-                    android:textStyle="bold"
-                    android:stateListAnimator="@null" />
-            </LinearLayout>
-
+            <!-- Nút Kiểm tra Shizuku -->
             <Button
                 android:id="@+id/btnCheckShizuku"
                 android:layout_width="match_parent"
                 android:layout_height="60dp"
                 android:layout_marginBottom="20dp"
-                android:background="@drawable/bg_button_secondary"
+                android:background="#1A2A3A"
                 android:text="🔍 KIỂM TRA SHIZUKU"
                 android:textColor="#00D2FF"
                 android:textSize="15sp"
                 android:textStyle="bold"
                 android:stateListAnimator="@null" />
 
+            <!-- Nút Khởi chạy -->
             <Button
                 android:id="@+id/btnStartProcTy"
                 android:layout_width="match_parent"
                 android:layout_height="65dp"
                 android:layout_marginTop="10dp"
                 android:layout_marginBottom="20dp"
-                android:background="@drawable/bg_button_primary"
-                android:text="⚡ KHỞI CHẠY PROCTY"
-                android:textColor="#FFFFFF"
+                android:background="#00D2FF"
+                android:text="⚡ KHỞI CHẠY HỆ THỐNG"
+                android:textColor="#000000"
                 android:textSize="18sp"
                 android:textStyle="bold"
                 android:stateListAnimator="@null" />
@@ -129,7 +95,7 @@
         </LinearLayout>
     </ScrollView>
 
-    <!-- Loading Layout Giữ Nguyên -->
+    <!-- Loading Layout -->
     <LinearLayout
         android:id="@+id/loadingLayout"
         android:layout_width="match_parent"

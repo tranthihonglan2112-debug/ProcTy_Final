@@ -14,6 +14,9 @@ import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
+import android.widget.Button;
+import android.widget.LinearLayout;
+import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
 import androidx.core.app.NotificationCompat;
@@ -21,8 +24,11 @@ import androidx.core.app.NotificationCompat;
 public class FloatingMenuService extends Service {
     private WindowManager windowManager;
     private View menuView;
-    private TextView btnToggle;
+    private TextView btnToggle, btnExpand;
+    private LinearLayout menuOptions;
+    private SeekBar seekBarPx;
     private boolean isScanning = false;
+    private boolean isExpanded = false;
 
     @Override
     public IBinder onBind(Intent intent) { return null; }
@@ -40,7 +46,7 @@ public class FloatingMenuService extends Service {
         }
         Notification notification = new NotificationCompat.Builder(this, channelId)
                 .setContentTitle("ProcTy Menu Active")
-                .setContentText("Nút điều khiển đang chạy...")
+                .setContentText("Bảng điều khiển đang chạy...")
                 .setSmallIcon(android.R.drawable.ic_menu_compass)
                 .build();
         startForeground(2, notification);
@@ -72,24 +78,65 @@ public class FloatingMenuService extends Service {
 
     private void initMenu() {
         LayoutInflater inflater = LayoutInflater.from(this);
-        // Dùng layout mới chỉ có 1 nút
         menuView = inflater.inflate(R.layout.floating_menu, null);
 
         btnToggle = menuView.findViewById(R.id.btnToggle);
+        btnExpand = menuView.findViewById(R.id.btnExpand);
+        menuOptions = menuView.findViewById(R.id.menuOptions);
+        seekBarPx = menuView.findViewById(R.id.seekBarPx);
+        Button btnNear = menuView.findViewById(R.id.btnNear);
+        Button btnFar = menuView.findViewById(R.id.btnFar);
 
-        // Đọc trạng thái cũ
         SharedPreferences prefs = getSharedPreferences("proc_ty_settings", MODE_PRIVATE);
         isScanning = prefs.getBoolean("is_scanning", false);
         updateButtonUI();
 
-        // Sự kiện Bấm nút
+        // Sự kiện Bật/Tắt ON/OFF
         btnToggle.setOnClickListener(v -> {
             isScanning = !isScanning;
             SharedPreferences.Editor editor = prefs.edit();
             editor.putBoolean("is_scanning", isScanning);
             editor.apply();
-            
             updateButtonUI();
+        });
+
+        // Sự kiện Mở rộng / Thu nhỏ Menu
+        btnExpand.setOnClickListener(v -> {
+            if (isExpanded) {
+                menuOptions.setVisibility(View.GONE);
+                btnExpand.setText("X");
+            } else {
+                menuOptions.setVisibility(View.VISIBLE);
+                btnExpand.setText("-");
+            }
+            isExpanded = !isExpanded;
+        });
+
+        // Sự kiện kéo thanh trượt (1 - 100px)
+        seekBarPx.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                // Lưu giá trị vào bộ nhớ
+                prefs.edit().putInt("compensation_px", progress).apply();
+            }
+            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
+        });
+
+        // Đọc giá trị thanh trượt (mặc định 40)
+        int pxValue = prefs.getInt("compensation_px", 40);
+        seekBarPx.setProgress(pxValue);
+
+        // Nút GẦN (Vuốt theo giá trị thanh trượt)
+        btnNear.setOnClickListener(v -> {
+            int px = seekBarPx.getProgress();
+            performSwipe(px);
+        });
+
+        // Nút XA (Vuốt nhẹ bằng một nửa giá trị thanh trượt)
+        btnFar.setOnClickListener(v -> {
+            int px = seekBarPx.getProgress() / 2; 
+            performSwipe(px);
         });
 
         int layoutType = (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) ?
@@ -102,7 +149,7 @@ public class FloatingMenuService extends Service {
         params.x = 100;
         params.y = 300;
 
-        // Sự kiện Kéo thả nút (Drag)
+        // Sự kiện Kéo thả Menu
         menuView.setOnTouchListener(new View.OnTouchListener() {
             private int initialX, initialY;
             private float initialTouchX, initialTouchY;
@@ -126,7 +173,21 @@ public class FloatingMenuService extends Service {
         windowManager.addView(menuView, params);
     }
 
-    // Cập nhật giao diện nút mỗi khi Bật/Tắt
+    // Hàm thực hiện vuốt
+    private void performSwipe(int pixels) {
+        int startX = 800;
+        int startY = 360;
+        int endX = 800;
+        int endY = 360 - pixels; // Vuốt lên trên
+
+        MinitouchController.swipePath(
+                AimMath.easedPath(startX, startY, endX, endY, 3),
+                20
+        );
+        Toast.makeText(this, "Bù trừ: " + pixels + "px", Toast.LENGTH_SHORT).show();
+    }
+
+    // Cập nhật giao diện nút ON/OFF
     private void updateButtonUI() {
         if (isScanning) {
             btnToggle.setText("ON");

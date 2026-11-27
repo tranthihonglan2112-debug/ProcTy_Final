@@ -9,9 +9,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.provider.Settings;
-import android.text.TextUtils;
 import android.widget.Button;
-import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -23,8 +21,7 @@ public class MainActivity extends AppCompatActivity {
     private static final int MEDIA_PROJECTION_REQ_CODE = 456;
     private MediaProjectionManager projectionManager;
 
-    private Button btnCheckShizuku, btnStartProcTy, btnSaveIp;
-    private EditText edtServerIp;
+    private Button btnCheckShizuku, btnStartProcTy;
     private LinearLayout mainLayout, loadingLayout;
     private TextView tvLoadingText;
     private Handler handler = new Handler();
@@ -59,17 +56,11 @@ public class MainActivity extends AppCompatActivity {
         tvLoadingText = findViewById(R.id.tvLoadingText);
         btnCheckShizuku = findViewById(R.id.btnCheckShizuku);
         btnStartProcTy = findViewById(R.id.btnStartProcTy);
-        btnSaveIp = findViewById(R.id.btnSaveIp);
-        edtServerIp = findViewById(R.id.edtServerIp);
 
         projectionManager = (MediaProjectionManager) getSystemService(MEDIA_PROJECTION_SERVICE);
 
         SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
         boolean isFirstRun = prefs.getBoolean("isFirstRun", true);
-        
-        // Load IP đã lưu (nếu có)
-        String savedIp = prefs.getString("server_ip", "dedication-schedule.tun.ply.gg");
-        edtServerIp.setText(savedIp);
 
         if (isFirstRun) {
             loadingLayout.setVisibility(LinearLayout.VISIBLE);
@@ -83,24 +74,8 @@ public class MainActivity extends AppCompatActivity {
         checkShizukuStatus(false);
         btnCheckShizuku.setOnClickListener(v -> checkShizukuStatus(true));
 
-        // Xử lý nút Lưu IP
-        btnSaveIp.setOnClickListener(v -> {
-            String ip = edtServerIp.getText().toString().trim();
-            if (TextUtils.isEmpty(ip)) {
-                Toast.makeText(this, "Vui lòng nhập IP/domain!", Toast.LENGTH_SHORT).show();
-                return;
-            }
-            SharedPreferences.Editor editor = prefs.edit();
-            editor.putString("server_ip", ip);
-            editor.apply();
-            Toast.makeText(this, "Đã lưu: " + ip, Toast.LENGTH_SHORT).show();
-        });
-
+        // Sự kiện nút Khởi Chạy
         btnStartProcTy.setOnClickListener(v -> {
-            // Luôn lưu IP đang hiện trong ô nhập (kể cả khi quên bấm "Lưu IP")
-            String curIp = edtServerIp.getText().toString().trim();
-            if (!TextUtils.isEmpty(curIp)) prefs.edit().putString("server_ip", curIp).apply();
-
             if (!ShizukuChecker.hasShizukuPermission()) {
                 Toast.makeText(this, "Chưa kết nối hoặc cấp quyền Shizuku!", Toast.LENGTH_SHORT).show();
                 return;
@@ -112,7 +87,6 @@ public class MainActivity extends AppCompatActivity {
     private void startFakeLoading(SharedPreferences prefs) {
         String[] steps = {
             "[*] Khởi tạo môi trường hệ thống...",
-            "[*] Kết nối máy chủ ProcTy ...",
             "[*] Tải module Native C++ (libprocty.so)...",
             "[*] Đồng bộ hóa lõi Shizuku...",
             "[*] Tối ưu hóa tài nguyên...",
