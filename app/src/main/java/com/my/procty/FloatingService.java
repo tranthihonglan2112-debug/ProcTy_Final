@@ -19,7 +19,6 @@ import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
-import android.widget.Toast;
 import androidx.core.app.NotificationCompat;
 
 public class FloatingService extends Service {
@@ -28,16 +27,18 @@ public class FloatingService extends Service {
     private static final int SWIPE_STEP_MS = 20;
 
     // TỌA ĐỘ NÚT BẮN (Ông chủ thay đổi cho khớp với máy mình)
-    private static final int START_X = 1312;
+    private static final int START_X = 1300;
     private static final int START_Y = 503; 
-    private static final int BUTTON_SIZE = 150; // Kích thước vùng đè
+    private static final int BUTTON_SIZE = 160; // Tăng lên 160 để dễ chạm hơn
 
     private WindowManager windowManager;
-    private View touchOverlayView; // Vùng cảm ứng đè lên nút bắn
+    private View touchOverlayView; 
     private MediaProjection mediaProjection;
     private MediaProjectionManager projectionManager;
     private final Handler uiHandler = new Handler(Looper.getMainLooper());
-    private boolean isTouchEnabled = false;
+    
+    // Biến dùng để hủy bộ đếm nếu người dùng nhấc tay sớm
+    private boolean isTouching = false;
 
     @Override
     public IBinder onBind(Intent intent) { return null; }
@@ -61,7 +62,7 @@ public class FloatingService extends Service {
                 if (resultCode != 0 && data != null) {
                     mediaProjection = projectionManager.getMediaProjection(resultCode, data);
                     if (mediaProjection != null) {
-                        setupTouchOverlay(); // Tạo nút đè sau khi có quyền
+                        setupTouchOverlay(); 
                     }
                 }
             }
@@ -95,11 +96,10 @@ public class FloatingService extends Service {
                 if (touchOverlayView != null) return;
                 touchOverlayView = new View(this);
                 
-                // Tạo nền mờ mờ để ông chủ nhìn thấy vùng đè (Alpha 10%)
                 android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
-                bg.setColor(0x1A00D2FF); // Xanh mờ
-                bg.setStroke(3, 0x4D00D2FF); // Viền xanh mờ
-                bg.setShape(android.graphics.drawable.GradientDrawable.OVAL); // Hình tròn
+                bg.setColor(0x1A00D2FF); 
+                bg.setStroke(3, 0x4D00D2FF); 
+                bg.setShape(android.graphics.drawable.GradientDrawable.OVAL); 
                 touchOverlayView.setBackground(bg);
 
                 int type = (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
@@ -108,32 +108,39 @@ public class FloatingService extends Service {
                 WindowManager.LayoutParams params = new WindowManager.LayoutParams(
                         BUTTON_SIZE, BUTTON_SIZE, type,
                         WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | 
-                        WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL, // Cho phép chạm ra ngoài
+                        WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL, 
                         PixelFormat.TRANSLUCENT);
                 params.gravity = Gravity.TOP | Gravity.LEFT;
                 
-                // Đặt vùng đè vào đúng vị trí nút bắn
                 params.x = START_X - BUTTON_SIZE / 2;
                 params.y = START_Y - BUTTON_SIZE / 2;
                 
-                // Xử lý sự kiện chạm
                 touchOverlayView.setOnTouchListener(new View.OnTouchListener() {
                     @Override
                     public boolean onTouch(View v, MotionEvent event) {
                         if (event.getAction() == MotionEvent.ACTION_DOWN) {
-                            // 1. Ẩn nút đè ngay lập tức để game nhận được cú chạm bắn
+                            isTouching = true;
+                            // 1. Ẩn nút đè để ngón tay thật vuốt
                             touchOverlayView.setVisibility(View.GONE);
                             
-                            // 2. Thực hiện bù trừ
-                            performCompensation();
+                            // 2. Chờ 250ms cho ngón tay thật vuốt, rồi mới bù trừ
+                            uiHandler.postDelayed(() -> {
+                                if (isTouching) {
+                                    performCompensation();
+                                }
+                            }, 250);
                             
-                            // 3. Hiện lại nút đè sau 600ms
+                            // 3. Hiện lại nút đè sau 200ms
                             uiHandler.postDelayed(() -> {
                                 if (touchOverlayView != null) {
                                     touchOverlayView.setVisibility(View.VISIBLE);
                                 }
-                            }, 600);
+                            }, 200);
                             
+                            return true;
+                        } else if (event.getAction() == MotionEvent.ACTION_UP) {
+                            // Nếu nhấc tay sớm, hủy việc bù trừ
+                            isTouching = false;
                             return true;
                         }
                         return false;
@@ -148,11 +155,9 @@ public class FloatingService extends Service {
     }
 
     private void performCompensation() {
-        // Đọc giá trị bù trừ từ thanh trượt (Mặc định là 40px)
         SharedPreferences prefs = getSharedPreferences("proc_ty_settings", MODE_PRIVATE);
         int pixels = prefs.getInt("compensation_px", 40);
 
-        // Vuốt bù trừ (lên trên)
         int endX = START_X;
         int endY = START_Y - pixels;
 
