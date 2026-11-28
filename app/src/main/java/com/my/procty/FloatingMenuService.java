@@ -24,7 +24,7 @@ import androidx.core.app.NotificationCompat;
 public class FloatingMenuService extends Service {
     private WindowManager windowManager;
     private View menuView;
-    private TextView btnToggle, btnExpand;
+    private TextView btnToggle, btnExpand, tvPixelValue;
     private LinearLayout menuOptions;
     private SeekBar seekBarPx;
     private boolean isScanning = false;
@@ -37,7 +37,6 @@ public class FloatingMenuService extends Service {
     public void onCreate() {
         super.onCreate();
         
-        // Khởi tạo Foreground Service để không bị kill
         String channelId = "menu_service_channel";
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = new NotificationChannel(channelId, "ProcTy Menu", NotificationManager.IMPORTANCE_LOW);
@@ -57,7 +56,7 @@ public class FloatingMenuService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        // Khởi chạy FloatingService (Aimbot) khi nhận quyền
+        // Khởi chạy FloatingService khi nhận quyền
         if (intent != null && intent.hasExtra("code") && intent.hasExtra("data")) {
             int resultCode = intent.getIntExtra("code", 0);
             Intent data = intent.getParcelableExtra("data");
@@ -84,6 +83,7 @@ public class FloatingMenuService extends Service {
         btnExpand = menuView.findViewById(R.id.btnExpand);
         menuOptions = menuView.findViewById(R.id.menuOptions);
         seekBarPx = menuView.findViewById(R.id.seekBarPx);
+        tvPixelValue = menuView.findViewById(R.id.tvPixelValue); // TextView hiện số pixel
         Button btnNear = menuView.findViewById(R.id.btnNear);
         Button btnFar = menuView.findViewById(R.id.btnFar);
 
@@ -91,7 +91,7 @@ public class FloatingMenuService extends Service {
         isScanning = prefs.getBoolean("is_scanning", false);
         updateButtonUI();
 
-        // Sự kiện Bật/Tắt ON/OFF
+        // Sự kiện Bật/Tắt ON/OFF (Hiện tại chỉ đổi màu)
         btnToggle.setOnClickListener(v -> {
             isScanning = !isScanning;
             SharedPreferences.Editor editor = prefs.edit();
@@ -116,24 +116,29 @@ public class FloatingMenuService extends Service {
         seekBarPx.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                // Lưu giá trị vào bộ nhớ
                 prefs.edit().putInt("compensation_px", progress).apply();
+                if (tvPixelValue != null) {
+                    tvPixelValue.setText(progress + " px"); // Cập nhật số pixel hiển thị
+                }
             }
             @Override public void onStartTrackingTouch(SeekBar seekBar) {}
             @Override public void onStopTrackingTouch(SeekBar seekBar) {}
         });
 
-        // Đọc giá trị thanh trượt (mặc định 40)
+        // Đọc giá trị thanh trượt (mặc định 40) và hiển thị
         int pxValue = prefs.getInt("compensation_px", 40);
         seekBarPx.setProgress(pxValue);
+        if (tvPixelValue != null) {
+            tvPixelValue.setText(pxValue + " px");
+        }
 
-        // Nút GẦN (Vuốt theo giá trị thanh trượt)
+        // Nút GẦN
         btnNear.setOnClickListener(v -> {
             int px = seekBarPx.getProgress();
             performSwipe(px);
         });
 
-        // Nút XA (Vuốt nhẹ bằng một nửa giá trị thanh trượt)
+        // Nút XA
         btnFar.setOnClickListener(v -> {
             int px = seekBarPx.getProgress() / 2; 
             performSwipe(px);
@@ -173,12 +178,13 @@ public class FloatingMenuService extends Service {
         windowManager.addView(menuView, params);
     }
 
-    // Hàm thực hiện vuốt
+    // Hàm thực hiện vuốt (ĐÃ SỬA TỌA ĐỘ)
     private void performSwipe(int pixels) {
-        int startX = 800;
-        int startY = 360;
-        int endX = 800;
-        int endY = 360 - pixels; // Vuốt lên trên
+        // TỌA ĐỘ NÚT BẮN (Góc dưới bên phải)
+        int startX = 950; // Thay đổi theo máy ông chủ
+        int startY = 2100; // Thay đổi theo máy ông chủ
+        int endX = 950;
+        int endY = 2100 - pixels; // Vuốt lên trên (giảm Y)
 
         MinitouchController.swipePath(
                 AimMath.easedPath(startX, startY, endX, endY, 3),

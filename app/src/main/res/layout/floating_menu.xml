@@ -22,7 +22,7 @@
         android:shadowDy="2"
         android:shadowRadius="4" />
 
-    <!-- Nút mở rộng Menu -->
+    <!-- Nút mở rộng Menu (Hình dấu X) -->
     <TextView
         android:id="@+id/btnExpand"
         android:layout_width="40dp"
@@ -41,51 +41,79 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:background="#AA000000"
-        android:padding="10dp"
+        android:background="@drawable/bg_button_secondary" 
+        android:padding="15dp"
         android:layout_marginTop="10dp"
         android:visibility="gone">
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Lực bù trừ (px)"
-            android:textColor="#00D2FF"
-            android:textSize="12sp" />
-
-        <SeekBar
-            android:id="@+id/seekBarPx"
-            android:layout_width="150dp"
-            android:layout_height="wrap_content"
-            android:max="100"
-            android:progress="40" />
-
+        <!-- Tiêu đề và số Pixel -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:layout_marginTop="10dp">
+            android:gravity="center_vertical"
+            android:layout_marginBottom="5dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:text="Lực bù trừ"
+                android:textColor="#00D2FF"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <!-- Text hiển thị số Pixel hiện tại -->
+            <TextView
+                android:id="@+id/tvPixelValue"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="40 px"
+                android:textColor="#00FF00"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <SeekBar
+            android:id="@+id/seekBarPx"
+            android:layout_width="180dp"
+            android:layout_height="wrap_content"
+            android:max="100"
+            android:progress="40"
+            android:progressTint="#00D2FF"
+            android:thumbTint="#00D2FF" />
+
+        <!-- 2 nút Gần / Xa -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="15dp">
 
             <Button
                 android:id="@+id/btnNear"
                 android:layout_width="0dp"
                 android:layout_weight="1"
-                android:layout_height="40dp"
+                android:layout_height="45dp"
                 android:text="GẦN"
-                android:textSize="12sp"
-                android:backgroundTint="#00FF00"
-                android:textColor="#000000" />
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:textColor="#00FF00"
+                android:background="@drawable/bg_neon_on"
+                android:stateListAnimator="@null" />
 
             <Button
                 android:id="@+id/btnFar"
                 android:layout_width="0dp"
                 android:layout_weight="1"
-                android:layout_height="40dp"
-                android:layout_marginStart="5dp"
+                android:layout_height="45dp"
+                android:layout_marginStart="10dp"
                 android:text="XA"
-                android:textSize="12sp"
-                android:backgroundTint="#FF0000"
-                android:textColor="#FFFFFF" />
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:textColor="#00D2FF"
+                android:background="@drawable/bg_neon_off"
+                android:stateListAnimator="@null" />
         </LinearLayout>
     </LinearLayout>
 </LinearLayout>
